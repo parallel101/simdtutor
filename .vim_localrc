@@ -1,0 +1,2 @@
+" vim: ft=vim
+au VimEnter main.cpp botright vsplit /tmp/benched.cpp | set ft=cpp | split /tmp/watched.s | set ft=nasm
