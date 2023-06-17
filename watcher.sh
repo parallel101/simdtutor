@@ -6,7 +6,7 @@ out="/tmp/watched.s"
 bench="/tmp/benched.cpp"
 result="/tmp/result.json"
 record="/tmp/record.json"
-cflags="-masm=intel -msse4.2 -mpopcnt -O3 -fopenmp"
+cflags="-masm=intel -mavx2 -mfma -O3 -fopenmp"
 cc="g++"
 
 lastmd5=
