@@ -34,7 +34,7 @@ do
                 /tmp/.W$$.executable.out | tee "$bench"
                 if [ x"$?" == x0 ]
                 then
-                    sed -n '/^\/\/ BEGIN CODE$/,/^\/\/ END CODE$/p' "$file" | sed '1d; $d' | python process.py "$result" "$record" "$bench"
+                    sed -n '/^\/\/ BEGIN CODE$/,/^\/\/ END CODE$/p' "$file" | sed '1d; $d' | python .watcher-helper.py "$result" "$record" "$bench"
                     echo '-- Benchmarking...'
                     rm -f /tmp/.W$$.executable.out
                     cat "$file" | sed '/\#include <gtest\/gtest.h>/d; /^TEST(\w\+, \w\+) {$/,/^}$/d' | "$cc" -x c++ /dev/stdin $cflags -o /tmp/.W$$.executable.out -lbenchmark -lbenchmark_main 2> /tmp/.W$$.gcc-error.log
