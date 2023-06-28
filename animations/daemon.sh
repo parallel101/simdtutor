@@ -1,5 +1,5 @@
 #!/bin/bash
-readlink media || (rm -rf media && mkdir -p /tmp/.W$$.manim.media && ln -sf /tmp/.W$$.manim.media media)
+(readlink media && test -d media) || (rm -rf media && mkdir -p /tmp/.W$$.manim.media && ln -sf /tmp/.W$$.manim.media media)
 while true
 do
     python -O -m manim -pql scene.py $1
