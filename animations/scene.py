@@ -11,74 +11,6 @@ opacities4 = [0.265, 0.28, 0.3, 0.33, 0.37, 0.41, 0.45, 0.5, 0.55, 0.6, 0.65, 0.
 opacities8 = [0.26, 0.27, 0.28, 0.29, 0.3, 0.315, 0.33, 0.35, 0.37, 0.39, 0.41, 0.43, 0.45, 0.47, 0.5, 0.525, 0.55, 0.575, 0.6, 0.625, 0.65, 0.675, 0.7, 0.725, 0.75, 0.785, 0.8, 0.825, 0.85, 0.875, 0.89, 0.915]
 
 
-class SetEPI32(Scene):
-    def construct(self):
-        title = Text("_mm_set_epi32")
-        title2 = Text("单独设置 4 个 int32 分量", font_size=32).shift(DOWN * 0.65)
-        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
-        self.wait(0.85)
-        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
-
-        arg_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.5).shift(DOWN)
-        arg_texts = Group(*[MathTex('xyzw'[i]).move_to(arg_rects[i]) for i in range(n)])
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(UP)
-
-        self.play(AnimationGroup(
-            FadeIn(arg_texts),
-            FadeIn(v1_rects),
-        ))
-        self.wait(0.55)
-
-        for i in range(n):
-            self.play(arg_texts[i].animate.move_to(v1_rects[i]), run_time=0.75)
-        self.wait(1)
-
-
-class Set1EPI32(Scene):
-    def construct(self):
-        title = Text("_mm_set1_epi32")
-        title2 = Text("全部 int32 元素设为同一个值", font_size=32).shift(DOWN * 0.65)
-        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
-        self.wait(0.85)
-        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
-
-        arg_texts = Group(*[MathTex('x').shift(1.25 * DOWN) for i in range(n)])
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(UP)
-
-        self.play(AnimationGroup(
-            FadeIn(arg_texts),
-            FadeIn(v1_rects),
-        ))
-        self.wait(0.85)
-
-        for i in range(n):
-            self.play(arg_texts[i].animate.move_to(v1_rects[i]), run_time=0.7)
-            self.wait(0.1)
-        self.wait(1)
-
-
-class SetzeroSI128(Scene):
-    def construct(self):
-        title = Text("_mm_setzero_si128")
-        title2 = Text("全部元素设为零", font_size=32).shift(DOWN * 0.65)
-        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
-        self.wait(0.85)
-        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
-
-        arg_texts = Group(*[MathTex('0').shift(1.25 * DOWN) for i in range(n)])
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(UP)
-
-        self.play(AnimationGroup(
-            FadeIn(arg_texts),
-            FadeIn(v1_rects),
-        ))
-        self.wait(0.8)
-
-        for i in range(n):
-            self.play(arg_texts[i].animate.move_to(v1_rects[i]), run_time=0.75)
-        self.wait(1)
-
-
 class AddEPI32(Scene):
     def construct(self):
         title = Text("_mm_add_epi32")
@@ -756,8 +688,75 @@ class MaddEPI16(Scene):
         self.wait(1)
 
 
-# class MaddubsEPI16(Scene):
-#     pass # TODO
+class MaddubsEPI16(Scene):
+    def construct(self):
+        title = Text("_mm_maddubs_epi16")
+        title2 = Text("2x16 个 int8 逐元素相乘变为 16 个 int16，水平饱和加得到 8 个 int16", font_size=32).shift(DOWN * 0.65)
+        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+        self.wait(1)
+        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+        hwps = dict(**globals()['hwps'])
+        hwpsx = dict(**globals()['hwps'])
+        hwps['width'] /= 1.89 * 2
+        hwpsx['width'] *= 1.23 / 2
+        n = globals()['n'] * 4
+        opacities = opacities4
+
+        v1 = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 8, 7, 6, 5, 4, 3, 2], dtype=np.int16)
+        v2 = np.array([1, 9, 6, 9, 2, 0, 2, 3, 2, 0, 7, 7, 1, 9, 8, 4], dtype=np.int16)
+        res1 = v1 * v2
+        res = np.array([res1[i * 2].astype(np.int32) + res1[i * 2 + 1].astype(np.int32) for i in range(n // 2)])
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.2).shift(UP)
+        v1_texts = Group(*[Text(str(v1[i])).move_to(v1_rects[i]) for i in range(n)])
+        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.2).shift(DOWN)
+        v2_texts = Group(*[Text(str(v2[i])).move_to(v2_rects[i]) for i in range(n)])
+        res1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=YELLOW) for i in range(n)]).arrange(endian, buff=0.2)
+        res_rects = Group(*[Rectangle(**hwpsx, fill_opacity=globals()['opacities2'][i], fill_color=RED) for i in range(n // 2)]).arrange(endian, buff=0.2)
+        res1_texts = Group(*[Text(str(res1[i])).move_to(res1_rects[i]) for i in range(n)])
+        res_texts = Group(*[Text(str(res[i])).move_to(res_rects[i]) for i in range(n // 2)])
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(v1_texts),
+            FadeIn(v2_rects),
+            FadeIn(v2_texts),
+        ))
+
+        op_texts = Group(*[Text("*").move_to(res1_rects[i]) for i in range(n)])
+        self.wait(0.75)
+        self.play(FadeIn(op_texts))
+        self.wait(1)
+        self.play(FadeOut(op_texts))
+
+        self.play(AnimationGroup(
+            v1_rects.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
+            v2_rects.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
+            v1_texts.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
+            v2_texts.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
+        ))
+        self.play(AnimationGroup(
+            FadeOut(v2_texts, run_time=1.05),
+            FadeOut(v2_rects, run_time=1.05),
+            Transform(v1_texts, res1_texts, run_time=1.05),
+            Transform(v1_rects, res1_rects, run_time=1.05),
+        ))
+
+        op_texts = Group(*[Text("+").move_to(res_rects[i]) for i in range(n // 2)])
+        self.wait(0.8)
+        self.play(FadeIn(op_texts))
+        self.wait(1)
+        self.play(FadeOut(op_texts))
+
+        self.wait(0.7)
+        self.play(AnimationGroup(
+            FadeOut(v1_texts, run_time=1.5),
+            FadeOut(v1_rects, run_time=1.5),
+            FadeIn(res_texts, run_time=1.5),
+            FadeIn(res_rects, run_time=1.5),
+        ))
+        self.wait(1)
 
 
 class MulloEPI16(Scene):
@@ -887,7 +886,7 @@ class MulhiEPI16(Scene):
 class MulhiEPU16(Scene):
     def construct(self):
         title = Text("_mm_mulhi_epu16")
-        title2 = Text("uint32 乘法，得到的 uint32 取高 16 位", font_size=32).shift(DOWN * 0.65)
+        title2 = Text("uint16 乘法，得到的 uint32 取高 16 位", font_size=32).shift(DOWN * 0.65)
         self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
         self.wait(1)
         self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
@@ -1027,294 +1026,6 @@ class MulhrsEPI16(Scene):
             FadeOut(res3_texts, run_time=1.5),
             FadeIn(res_texts, run_time=1.5),
         ))
-        self.wait(1)
-
-
-class MaxEPI16(Scene):
-    def construct(self):
-        title = Text("_mm_max_epi16")
-        title2 = Text("逐元素 int16 求最大值", font_size=32).shift(DOWN * 0.65)
-        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
-        self.wait(1)
-        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
-
-        v1 = np.array([500, 1200, -300, -1500, -600, -700, -50, 800], dtype=np.int16) * 40
-        v2 = np.array([-40, 840, -480, -720, 90, -1000, 20, -960], dtype=np.int16) * 50
-        res = np.maximum(v1.astype(np.int16), v2.astype(np.int16)).astype(np.int16)
-
-        hwps = dict(**globals()['hwps'])
-        hwps['width'] /= 1.7
-        n = globals()['n'] * 2
-        opacities = opacities2
-
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.25).shift(UP)
-        v1_texts = Group(*[Text(str(v1[i]), font_size=36).move_to(v1_rects[i]) for i in range(n)])
-        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.25).shift(DOWN)
-        v2_texts = Group(*[Text(str(v2[i]), font_size=36).move_to(v2_rects[i]) for i in range(n)])
-        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.25)
-        res_texts = Group(*[Text(str(res[i]), font_size=36).move_to(res_rects[i]) for i in range(n)])
-        op_texts = Group(*[Text("MAX", font_size=32).move_to(res_rects[i]) for i in range(n)])
-
-        self.play(AnimationGroup(
-            FadeIn(v1_rects),
-            FadeIn(v1_texts),
-            FadeIn(v2_rects),
-            FadeIn(v2_texts),
-        ))
-        self.wait(0.75)
-        self.play(FadeIn(op_texts))
-        self.wait(0.8)
-        self.play(FadeOut(op_texts))
-
-        self.wait(0.6)
-        animations = []
-        for i in range(n):
-            if res[i] == v1[i]:
-                animations.append(v1_texts[i].animate.shift(0.25 * UP))
-            if res[i] == v2[i]:
-                animations.append(v2_texts[i].animate.shift(0.25 * UP))
-        self.play(AnimationGroup(*animations), run_time=0.25)
-        self.wait(0.2)
-        animations = []
-        for i in range(n):
-            if res[i] == v1[i]:
-                animations.append(v1_texts[i].animate.shift(0.25 * DOWN))
-            if res[i] == v2[i]:
-                animations.append(v2_texts[i].animate.shift(0.25 * DOWN))
-        self.play(AnimationGroup(*animations), run_time=0.25)
-        self.wait(0.8)
-
-        self.play(AnimationGroup(
-            v1_rects.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
-            v2_rects.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
-            v1_texts.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
-            v2_texts.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
-        ))
-        self.play(AnimationGroup(
-            FadeOut(v1_texts, run_time=1.25),
-            FadeOut(v2_texts, run_time=1.25),
-            FadeIn(res_texts, run_time=1.25),
-        ))
-        self.wait(1)
-
-
-class MinEPU16(Scene):
-    def construct(self):
-        title = Text("_mm_min_epu16")
-        title2 = Text("逐元素 uint16 求最小值", font_size=32).shift(DOWN * 0.65)
-        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
-        self.wait(1)
-        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
-
-        v1 = np.array([500, 1200, -300, -1500, -600, -700, -50, 800], dtype=np.uint16) * 40
-        v2 = np.array([-40, 840, -480, -720, 90, -1000, 20, -960], dtype=np.uint16) * 50
-        res = np.minimum(v1.astype(np.uint16), v2.astype(np.uint16)).astype(np.uint16)
-
-        hwps = dict(**globals()['hwps'])
-        hwps['width'] /= 1.7
-        n = globals()['n'] * 2
-        opacities = opacities2
-
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.25).shift(UP)
-        v1_texts = Group(*[Text(str(v1[i]), font_size=36).move_to(v1_rects[i]) for i in range(n)])
-        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.25).shift(DOWN)
-        v2_texts = Group(*[Text(str(v2[i]), font_size=36).move_to(v2_rects[i]) for i in range(n)])
-        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.25)
-        res_texts = Group(*[Text(str(res[i]), font_size=36).move_to(res_rects[i]) for i in range(n)])
-        op_texts = Group(*[Text("MIN", font_size=32).move_to(res_rects[i]) for i in range(n)])
-
-        self.play(AnimationGroup(
-            FadeIn(v1_rects),
-            FadeIn(v1_texts),
-            FadeIn(v2_rects),
-            FadeIn(v2_texts),
-        ))
-        self.wait(0.75)
-        self.play(FadeIn(op_texts))
-        self.wait(0.8)
-        self.play(FadeOut(op_texts))
-
-        self.wait(0.6)
-        animations = []
-        for i in range(n):
-            if res[i] == v1[i]:
-                animations.append(v1_texts[i].animate.shift(0.25 * UP))
-            if res[i] == v2[i]:
-                animations.append(v2_texts[i].animate.shift(0.25 * UP))
-        self.play(AnimationGroup(*animations), run_time=0.25)
-        self.wait(0.2)
-        animations = []
-        for i in range(n):
-            if res[i] == v1[i]:
-                animations.append(v1_texts[i].animate.shift(0.25 * DOWN))
-            if res[i] == v2[i]:
-                animations.append(v2_texts[i].animate.shift(0.25 * DOWN))
-        self.play(AnimationGroup(*animations), run_time=0.25)
-        self.wait(0.8)
-
-        self.play(AnimationGroup(
-            v1_rects.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
-            v2_rects.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
-            v1_texts.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
-            v2_texts.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
-        ))
-        self.play(AnimationGroup(
-            FadeOut(v1_texts, run_time=1.25),
-            FadeOut(v2_texts, run_time=1.25),
-            FadeIn(res_texts, run_time=1.25),
-        ))
-        self.wait(1)
-
-
-class MinposEPU16(Scene): # TODO
-    def construct(self):
-        title = Text("_mm_minpos_epu16")
-        title2 = Text("求 8 个 uint16 的最小值（水平），并记录最小值所在的下标（0到7）", font_size=32).shift(DOWN * 0.65)
-        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
-        self.wait(1)
-        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
-
-        v1 = np.array([500, 1200, 300, 1500, 600, 700, 300, 800], dtype=np.uint16) // 10
-        res = np.argmin(v1.astype(np.uint16))
-
-        hwps = dict(**globals()['hwps'])
-        hwps['width'] /= 1.7
-        n = globals()['n'] * 2
-        opacities = opacities2
-
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.25).shift(UP)
-        v1_texts = Group(*[Text(str(v1[i])).move_to(v1_rects[i]) for i in range(n)])
-        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.25)
-        res_texts = Group(*[Text(str(res if i == 1 else v1[res] if i == 0 else 0)).move_to(res_rects[i]) for i in range(n)])
-        ind_texts = Group(*[Text(str(i)).move_to(res_rects[i]).shift(DOWN * 0.65) for i in range(n)])
-        op_text = Text("ARGMIN").shift(DOWN * 1.95)
-
-        self.play(AnimationGroup(
-            FadeIn(v1_rects),
-            FadeIn(v1_texts),
-            FadeIn(ind_texts),
-        ))
-        self.wait(0.75)
-        self.play(FadeIn(op_text))
-        self.wait(0.8)
-        self.play(FadeOut(op_text))
-
-        self.wait(0.6)
-        animations = []
-        animations.append(v1_texts[res].animate.shift(0.25 * UP))
-        animations.append(ind_texts[res].animate.shift(0.25 * UP))
-        self.play(AnimationGroup(*animations), run_time=0.25)
-        self.wait(0.2)
-        animations = []
-        animations.append(v1_texts[res].animate.shift(0.25 * DOWN))
-        animations.append(ind_texts[res].animate.shift(0.25 * DOWN))
-        self.play(AnimationGroup(*animations), run_time=0.25)
-        self.wait(0.8)
-
-        animations = []
-        for i in range(n):
-            if i != res:
-                animations.append(FadeOut(ind_texts[i]))
-                animations.append(FadeOut(v1_texts[i]))
-                animations.append(FadeOut(v1_rects[i]))
-        self.play(AnimationGroup(*animations))
-
-        animations = []
-        animations.append(Transform(v1_texts[res], res_texts[0]))
-        animations.append(Transform(v1_rects[res], res_rects[0]))
-        animations.append(Transform(ind_texts[res], res_texts[1]))
-        self.play(AnimationGroup(*animations), run_time=1.4)
-
-        animations = []
-        for i in range(1, n):
-            animations.append(FadeIn(res_rects[i]))
-        for i in range(2, n):
-            animations.append(FadeIn(res_texts[i]))
-        self.play(AnimationGroup(*animations))
-
-        self.wait(1)
-
-
-class ShuffleEPI32(Scene):
-    def construct(self):
-        title = Text("_mm_shuffle_epi32")
-        title2 = Text("给寄存器中的 4 个 int32 重排序，顺序通过立即数指定", font_size=32).shift(DOWN * 0.65)
-        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
-        self.wait(0.85)
-        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
-
-        shuf = [3, 1, 0, 2]
-
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(1.5 * UP)
-        imm_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(len(shuf))]).arrange(endian, buff=0.5).shift(2.25 * DOWN)
-        imm_texts = Group(*[Text(str(shuf[i])).move_to(imm_rects[i]) for i in range(len(shuf))])
-
-        self.play(AnimationGroup(
-            FadeIn(v1_rects),
-            FadeIn(imm_texts),
-        ))
-        self.wait(0.5)
-
-        objs = []
-        for i in range(n):
-            self.play(imm_texts[i].animate.shift(0.25 * UP), run_time=0.25)
-            self.play(imm_texts[i].animate.shift(0.25 * DOWN), run_time=0.25)
-            self.wait(0.5)
-
-            obj = v1_rects[shuf[i]].copy()
-            self.play(FadeIn(obj, run_time=0.1))
-            self.play(obj.animate.shift(0.25 * UP), run_time=0.5)
-            self.play(obj.animate.move_to(imm_texts[i]))
-            self.wait(0.5)
-            objs.append(obj)
-        objs = Group(*objs)
-
-        self.play(FadeOut(v1_rects, run_time=0.5))
-        self.play(FadeOut(imm_texts, run_time=0.5))
-        self.play(objs.animate(lag_ratio=0.5, run_time=1).move_to(ORIGIN))
-        self.wait(1)
-
-
-class ShuffleEPI8(Scene):
-    def construct(self):
-        title = Text("_mm_shuffle_epi8")
-        title2 = Text("给寄存器中的 16 个 int8 重排序，顺序通过立即数指定", font_size=32).shift(DOWN * 0.65)
-        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
-        self.wait(0.85)
-        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
-
-        hwps = dict(**globals()['hwps'])
-        hwps['width'] /= 3.5
-        n = globals()['n'] * 4
-        opacities = opacities4
-
-        shuf = [3, 7, 1, 8, 9, 15, 11, 0, 14, 6, 2, 12, 10, 5, 4, 13]
-
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.15).shift(1.5 * UP)
-        imm_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(len(shuf))]).arrange(endian, buff=0.15).shift(2.25 * DOWN)
-        imm_texts = Group(*[Text(str(shuf[i]), font_size=36).move_to(imm_rects[i]) for i in range(len(shuf))])
-
-        self.play(AnimationGroup(
-            FadeIn(v1_rects),
-            FadeIn(imm_texts),
-        ))
-        self.wait(0.5)
-
-        objs = []
-        for i in range(n):
-            self.play(imm_texts[i].animate.shift(0.25 * UP), run_time=0.05)
-            self.play(imm_texts[i].animate.shift(0.25 * DOWN), run_time=0.05)
-
-            obj = v1_rects[shuf[i]].copy()
-            self.play(FadeIn(obj, run_time=0.04))
-            self.play(obj.animate.shift(0.25 * UP), run_time=0.08)
-            self.play(obj.animate.move_to(imm_texts[i]), run_time=0.13)
-            objs.append(obj)
-        objs = Group(*objs)
-
-        self.play(FadeOut(v1_rects, run_time=0.5))
-        self.play(FadeOut(imm_texts, run_time=0.5))
-        self.play(objs.animate(lag_ratio=0.5, run_time=1).move_to(ORIGIN))
         self.wait(1)
 
 
@@ -1480,47 +1191,166 @@ class BsrliSI128(Scene):
 class SrliEPI32(Scene):
     def construct(self):
         title = Text("_mm_srli_epi32")
-        title2 = Text("int32 逐个按位右移，位数由立即数指定，高位填充 0", font_size=32).shift(DOWN * 0.65)
+        title2 = Text("int32 逐个按位右移，位数由立即数指定，高位填充 0（逻辑右移）", font_size=32).shift(DOWN * 0.65)
+        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+        self.wait(0.85)
+        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+        offset = 3
+
+        v1 = np.array([500, -1200, 300, -600], dtype=np.int32) // 10
+        res = v1.astype(np.int32).astype(np.uint32) >> offset
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.4)
+        v1_texts = Group(*[Text(str(v1[i])).move_to(v1_rects[i]) for i in range(n)])
+        res_texts = Group(*[Text(str(res[i]), font_size=32).move_to(v1_rects[i]) for i in range(n)])
+        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.4)
+        op_texts = Group(*[Text(">>" + str(offset), font_size=32).move_to(res_rects[i]).shift(0.85 * DOWN) for i in range(n)])
+        imm_text = Text(str(offset)).shift(2.4 * DOWN)
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(v1_texts),
+            FadeIn(imm_text),
+        ))
+
+        self.wait(0.6)
+        self.play(imm_text.animate.shift(0.25 * UP), run_time=0.15)
+        self.wait(0.15)
+        self.play(imm_text.animate.shift(0.25 * DOWN), run_time=0.15)
+
+        self.wait(0.6)
+        self.play(FadeIn(op_texts), FadeOut(imm_text))
+        self.wait(0.8)
+        self.play(FadeOut(op_texts))
+
+        self.wait(0.8)
+        self.play(Transform(v1_texts, res_texts), run_time=1.5)
+        self.wait(1)
+
+
+
+class SraiEPI32(Scene):
+    def construct(self):
+        title = Text("_mm_srai_epi32")
+        title2 = Text("int32 逐个按位右移，位数由立即数指定，高位填充符号位（算术右移）", font_size=32).shift(DOWN * 0.65)
+        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+        self.wait(0.85)
+        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+        offset = 3
+
+        v1 = np.array([500, -1200, 300, -600], dtype=np.int32) // 10
+        res = v1.astype(np.int32) >> offset
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.4)
+        v1_texts = Group(*[Text(str(v1[i])).move_to(v1_rects[i]) for i in range(n)])
+        res_texts = Group(*[Text(str(res[i])).move_to(v1_rects[i]) for i in range(n)])
+        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.4)
+        op_texts = Group(*[Text(">>" + str(offset), font_size=32).move_to(res_rects[i]).shift(0.85 * DOWN) for i in range(n)])
+        imm_text = Text(str(offset)).shift(2.4 * DOWN)
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(v1_texts),
+            FadeIn(imm_text),
+        ))
+
+        self.wait(0.6)
+        self.play(imm_text.animate.shift(0.25 * UP), run_time=0.15)
+        self.wait(0.15)
+        self.play(imm_text.animate.shift(0.25 * DOWN), run_time=0.15)
+
+        self.wait(0.6)
+        self.play(FadeIn(op_texts), FadeOut(imm_text))
+        self.wait(0.8)
+        self.play(FadeOut(op_texts))
+
+        self.wait(0.8)
+        self.play(Transform(v1_texts, res_texts), run_time=1.5)
+        self.wait(1)
+
+
+class ShuffleEPI32(Scene):
+    def construct(self):
+        title = Text("_mm_shuffle_epi32")
+        title2 = Text("给寄存器中的 4 个 int32 重排序，顺序通过立即数指定", font_size=32).shift(DOWN * 0.65)
+        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+        self.wait(0.85)
+        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+        shuf = [3, 1, 0, 2]
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(1.5 * UP)
+        imm_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(len(shuf))]).arrange(endian, buff=0.5).shift(2.25 * DOWN)
+        imm_texts = Group(*[Text(str(shuf[i])).move_to(imm_rects[i]) for i in range(len(shuf))])
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(imm_texts),
+        ))
+        self.wait(0.5)
+
+        objs = []
+        for i in range(n):
+            self.play(imm_texts[i].animate.shift(0.25 * UP), run_time=0.25)
+            self.play(imm_texts[i].animate.shift(0.25 * DOWN), run_time=0.25)
+            self.wait(0.5)
+
+            obj = v1_rects[shuf[i]].copy()
+            self.play(FadeIn(obj, run_time=0.1))
+            self.play(obj.animate.shift(0.25 * UP), run_time=0.5)
+            self.play(obj.animate.move_to(imm_texts[i]))
+            self.wait(0.5)
+            objs.append(obj)
+        objs = Group(*objs)
+
+        self.play(FadeOut(v1_rects, run_time=0.5))
+        self.play(FadeOut(imm_texts, run_time=0.5))
+        self.play(objs.animate(lag_ratio=0.5, run_time=1).move_to(ORIGIN))
+        self.wait(1)
+
+
+class ShuffleEPI8(Scene):
+    def construct(self):
+        title = Text("_mm_shuffle_epi8")
+        title2 = Text("给寄存器中的 16 个 int8 重排序，顺序通过立即数指定", font_size=32).shift(DOWN * 0.65)
         self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
         self.wait(0.85)
         self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
 
         hwps = dict(**globals()['hwps'])
-        hwps['width'] /= 3.85
+        hwps['width'] /= 3.5
         n = globals()['n'] * 4
         opacities = opacities4
 
-        offset = 5
+        shuf = [3, 7, 1, 8, 9, 15, 11, 0, 14, 6, 2, 12, 10, 5, 4, 13]
 
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.15)
-        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i % n], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.15)
-        imm_text = Text(str(offset)).shift(2.4 * DOWN)
-        zero_texts = Group(*[Text('0').move_to(res_rects[i]) for i in range(len(res_rects))])
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.15).shift(1.5 * UP)
+        imm_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(len(shuf))]).arrange(endian, buff=0.15).shift(2.25 * DOWN)
+        imm_texts = Group(*[Text(str(shuf[i]), font_size=36).move_to(imm_rects[i]) for i in range(len(shuf))])
 
         self.play(AnimationGroup(
             FadeIn(v1_rects),
-            FadeIn(imm_text),
+            FadeIn(imm_texts),
         ))
-        self.wait(0.8)
-
-        self.play(imm_text.animate.shift(0.25 * UP), run_time=0.5)
-        self.play(imm_text.animate.shift(0.25 * DOWN), run_time=0.5)
         self.wait(0.5)
 
-        animations = []
-        animations1 = []
-        animations2 = []
+        objs = []
         for i in range(n):
-            if i - offset < 0:
-                animations1.append(FadeOut(v1_rects[i]))
-            else:
-                animations.append(v1_rects[i].animate.move_to(res_rects[i - offset]))
-        for i in range(offset):
-            animations2.append(FadeIn(res_rects[n - 1 - i]))
-            animations2.append(FadeIn(zero_texts[n - 1 - i]))
-        self.play(AnimationGroup(*animations1), run_time=1.0)
-        self.play(AnimationGroup(*animations), run_time=1.5)
-        self.play(AnimationGroup(*animations2), run_time=0.8)
+            self.play(imm_texts[i].animate.shift(0.25 * UP), run_time=0.05)
+            self.play(imm_texts[i].animate.shift(0.25 * DOWN), run_time=0.05)
+
+            obj = v1_rects[shuf[i]].copy()
+            self.play(FadeIn(obj, run_time=0.04))
+            self.play(obj.animate.shift(0.25 * UP), run_time=0.08)
+            self.play(obj.animate.move_to(imm_texts[i]), run_time=0.13)
+            objs.append(obj)
+        objs = Group(*objs)
+
+        self.play(FadeOut(v1_rects, run_time=0.5))
+        self.play(FadeOut(imm_texts, run_time=0.5))
+        self.play(objs.animate(lag_ratio=0.5, run_time=1).move_to(ORIGIN))
         self.wait(1)
 
 
@@ -1596,66 +1426,6 @@ class InsertEPI16(Scene):
         self.wait(0.6)
         self.play(FadeOut(arg_texts[idx]), ins_text.copy().animate.move_to(arg_texts[idx]), run_time=0.75)
         self.wait(1)
-
-
-class PacksEPI32(Scene):
-    def construct(self): # TODO
-        title = Text("_mm_packs_epi32")
-        title2 = Text("两个寄存器中的 8 个 int32 元素，放入一个寄存器中的 8 个 int16 元素中去，饱和处理", font_size=32).shift(DOWN * 0.65)
-        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
-        self.wait(0.85)
-        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
-
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(UP)
-        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.5)
-        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.5).shift(DOWN)
-
-        self.play(AnimationGroup(
-            FadeIn(v1_rects),
-            FadeIn(v2_rects),
-        ))
-        self.wait(0.75)
-
-        self.play(*[FadeOut(v1_rects[i]) for i in range(n) if i >= n // 2],
-                  *[FadeOut(v2_rects[i]) for i in range(n) if i >= n // 2],
-                  run_time=1.25)
-        self.wait(0.25)
-        self.play(*[v1_rects[i].animate.move_to(res_rects[i * 2]) for i in range(n) if i < n // 2],
-                  *[v2_rects[i].animate.move_to(res_rects[i * 2 + 1]) for i in range(n) if i < n // 2],
-                  run_time=2)
-        self.wait(1.25)
-
-
-class UnpackloEPI16(Scene):
-    def construct(self):
-        title = Text("_mm_unpacklo_epi16")
-        self.play(Write(title, run_time=1.25))
-        self.wait(1)
-        self.play(title.animate.shift(UP * 3.5), run_time=0.25)
-
-        hwps = dict(**globals()['hwps'])
-        hwps['width'] /= 1.7
-        n = globals()['n'] * 2
-        opacities = opacities2
-
-        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.25).shift(UP)
-        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.25)
-        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.25).shift(DOWN)
-
-        self.play(AnimationGroup(
-            FadeIn(v1_rects),
-            FadeIn(v2_rects),
-        ))
-        self.wait(0.75)
-
-        self.play(*[FadeOut(v1_rects[i]) for i in range(n) if i >= n // 2],
-                  *[FadeOut(v2_rects[i]) for i in range(n) if i >= n // 2],
-                  run_time=1.25)
-        self.wait(0.25)
-        self.play(*[v1_rects[i].animate.move_to(res_rects[i * 2]) for i in range(n) if i < n // 2],
-                  *[v2_rects[i].animate.move_to(res_rects[i * 2 + 1]) for i in range(n) if i < n // 2],
-                  run_time=2)
-        self.wait(1.25)
 
 
 class UnpackhiEPI16(Scene):
@@ -1743,6 +1513,349 @@ class MoveEPI64(Scene):
         self.wait(1.25)
 
 
+class PacksEPI32(Scene):
+    def construct(self):
+        title = Text("_mm_packs_epi32")
+        title2 = Text("两个寄存器中的 2x4 个 int32 元素，压缩到一个寄存器中的 8 个 int16 元素中去，溢出部分饱和处理", font_size=22).shift(DOWN * 0.65)
+        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+        self.wait(0.85)
+        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+        v1 = np.array([500, 1200, 480, -1500], dtype=np.int32) * 40
+        v2 = np.array([-40, 1840, -300, 720], dtype=np.int32) * 50
+        res = np.array(list(v1) + list(v2), dtype=np.int32)
+        res2 = np.minimum(np.maximum(res, -32768), 32767).astype(np.int16)
+
+        hwps2 = dict(**globals()['hwps'])
+        hwps2['width'] /= 1.7
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(UP)
+        v1_texts = Group(*[Text(str(v1[i]), font_size=32).move_to(v1_rects[i]) for i in range(n)])
+        res_rects = Group(*[Rectangle(**hwps2, fill_opacity=opacities2[i], fill_color=YELLOW if (i // 4) % 2 == 0 else PURPLE) for i in range(n * 2)]).arrange(endian, buff=0.25)
+        res_rects1 = list(res_rects.submobjects[:n])
+        res_rects2 = list(res_rects.submobjects[n:])
+        res_texts = Group(*[Text(str(res[i]), font_size=32).move_to(res_rects[i]) for i in range(n * 2)])
+        res2_texts = Group(*[Text(str(res2[i]), font_size=29).move_to(res_rects[i]) for i in range(n * 2)])
+        res2_texts1 = list(res2_texts.submobjects[:n])
+        res2_texts2 = list(res2_texts.submobjects[n:])
+        res_texts1 = list(res_texts.submobjects[:n])
+        res_texts2 = list(res_texts.submobjects[n:])
+        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.5).shift(DOWN)
+        v2_texts = Group(*[Text(str(v2[i]), font_size=32).move_to(v2_rects[i]) for i in range(n)])
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(v2_rects),
+            FadeIn(v1_texts),
+            FadeIn(v2_texts),
+        ))
+        self.wait(0.75)
+
+        self.play(AnimationGroup(
+            *[Transform(v1_rects[i], res_rects1[i]) for i in range(n)],
+            *[Transform(v2_rects[i], res_rects2[i]) for i in range(n)],
+            *[Transform(v1_texts[i], res_texts1[i]) for i in range(n)],
+            *[Transform(v2_texts[i], res_texts2[i]) for i in range(n)],
+        ), run_time=1.8)
+        self.wait(0.75)
+
+        self.play(AnimationGroup(
+            *[Transform(v1_texts[i], res2_texts1[i]) for i in range(n)],
+            *[Transform(v2_texts[i], res2_texts2[i]) for i in range(n)],
+        ), run_time=1)
+        self.wait(1.35)
+
+
+class PackusEPI32(Scene):
+    def construct(self):
+        title = Text("_mm_packus_epi32")
+        title2 = Text("两个寄存器中的 2x4 个 int32 元素，压缩到一个寄存器中的 8 个 uint16 元素中去，溢出部分饱和处理", font_size=22).shift(DOWN * 0.65)
+        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+        self.wait(0.85)
+        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+        v1 = np.array([500, 1200, 480, -1500], dtype=np.int32) * 40
+        v2 = np.array([-40, 1840, -300, 720], dtype=np.int32) * 50
+        res = np.array(list(v1) + list(v2), dtype=np.int32)
+        res2 = np.minimum(np.maximum(res, 0), 65535).astype(np.uint16)
+
+        hwps2 = dict(**globals()['hwps'])
+        hwps2['width'] /= 1.7
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(UP)
+        v1_texts = Group(*[Text(str(v1[i]), font_size=32).move_to(v1_rects[i]) for i in range(n)])
+        res_rects = Group(*[Rectangle(**hwps2, fill_opacity=opacities2[i], fill_color=YELLOW if (i // 4) % 2 == 0 else PURPLE) for i in range(n * 2)]).arrange(endian, buff=0.25)
+        res_rects1 = list(res_rects.submobjects[:n])
+        res_rects2 = list(res_rects.submobjects[n:])
+        res_texts = Group(*[Text(str(res[i]), font_size=32).move_to(res_rects[i]) for i in range(n * 2)])
+        res2_texts = Group(*[Text(str(res2[i]), font_size=29).move_to(res_rects[i]) for i in range(n * 2)])
+        res2_texts1 = list(res2_texts.submobjects[:n])
+        res2_texts2 = list(res2_texts.submobjects[n:])
+        res_texts1 = list(res_texts.submobjects[:n])
+        res_texts2 = list(res_texts.submobjects[n:])
+        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.5).shift(DOWN)
+        v2_texts = Group(*[Text(str(v2[i]), font_size=32).move_to(v2_rects[i]) for i in range(n)])
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(v2_rects),
+            FadeIn(v1_texts),
+            FadeIn(v2_texts),
+        ))
+        self.wait(0.75)
+
+        self.play(AnimationGroup(
+            *[Transform(v1_rects[i], res_rects1[i]) for i in range(n)],
+            *[Transform(v2_rects[i], res_rects2[i]) for i in range(n)],
+            *[Transform(v1_texts[i], res_texts1[i]) for i in range(n)],
+            *[Transform(v2_texts[i], res_texts2[i]) for i in range(n)],
+        ), run_time=1.8)
+        self.wait(0.75)
+
+        self.play(AnimationGroup(
+            *[Transform(v1_texts[i], res2_texts1[i]) for i in range(n)],
+            *[Transform(v2_texts[i], res2_texts2[i]) for i in range(n)],
+        ), run_time=1)
+        self.wait(1.35)
+
+
+class UnpackloEPI16(Scene):
+    def construct(self):
+        title = Text("_mm_unpacklo_epi16")
+        self.play(Write(title, run_time=1.25))
+        self.wait(1)
+        self.play(title.animate.shift(UP * 3.5), run_time=0.25)
+
+        hwps = dict(**globals()['hwps'])
+        hwps['width'] /= 1.7
+        n = globals()['n'] * 2
+        opacities = opacities2
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.25).shift(UP)
+        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.25)
+        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.25).shift(DOWN)
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(v2_rects),
+        ))
+        self.wait(0.75)
+
+        self.play(*[FadeOut(v1_rects[i]) for i in range(n) if i >= n // 2],
+                  *[FadeOut(v2_rects[i]) for i in range(n) if i >= n // 2],
+                  run_time=1.25)
+        self.wait(0.25)
+        self.play(*[v1_rects[i].animate.move_to(res_rects[i * 2]) for i in range(n) if i < n // 2],
+                  *[v2_rects[i].animate.move_to(res_rects[i * 2 + 1]) for i in range(n) if i < n // 2],
+                  run_time=2)
+        self.wait(1.25)
+
+
+class MaxEPI16(Scene):
+    def construct(self):
+        title = Text("_mm_max_epi16")
+        title2 = Text("逐元素 int16 求最大值", font_size=32).shift(DOWN * 0.65)
+        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+        self.wait(1)
+        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+        v1 = np.array([500, 1200, -300, -1500, -600, -700, -50, 800], dtype=np.int16) * 40
+        v2 = np.array([-40, 840, -480, -720, 90, -1000, 20, -960], dtype=np.int16) * 50
+        res = np.maximum(v1.astype(np.int16), v2.astype(np.int16)).astype(np.int16)
+
+        hwps = dict(**globals()['hwps'])
+        hwps['width'] /= 1.7
+        n = globals()['n'] * 2
+        opacities = opacities2
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.25).shift(UP)
+        v1_texts = Group(*[Text(str(v1[i]), font_size=36).move_to(v1_rects[i]) for i in range(n)])
+        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.25).shift(DOWN)
+        v2_texts = Group(*[Text(str(v2[i]), font_size=36).move_to(v2_rects[i]) for i in range(n)])
+        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.25)
+        res_texts = Group(*[Text(str(res[i]), font_size=36).move_to(res_rects[i]) for i in range(n)])
+        op_texts = Group(*[Text("MAX", font_size=32).move_to(res_rects[i]) for i in range(n)])
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(v1_texts),
+            FadeIn(v2_rects),
+            FadeIn(v2_texts),
+        ))
+        self.wait(0.75)
+        self.play(FadeIn(op_texts))
+        self.wait(0.8)
+        self.play(FadeOut(op_texts))
+
+        self.wait(0.6)
+        animations = []
+        for i in range(n):
+            if res[i] == v1[i]:
+                animations.append(v1_texts[i].animate.shift(0.25 * UP))
+            if res[i] == v2[i]:
+                animations.append(v2_texts[i].animate.shift(0.25 * UP))
+        self.play(AnimationGroup(*animations), run_time=0.25)
+        self.wait(0.2)
+        animations = []
+        for i in range(n):
+            if res[i] == v1[i]:
+                animations.append(v1_texts[i].animate.shift(0.25 * DOWN))
+            if res[i] == v2[i]:
+                animations.append(v2_texts[i].animate.shift(0.25 * DOWN))
+        self.play(AnimationGroup(*animations), run_time=0.25)
+        self.wait(0.8)
+
+        self.play(AnimationGroup(
+            v1_rects.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
+            v2_rects.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
+            v1_texts.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
+            v2_texts.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
+        ))
+        self.play(AnimationGroup(
+            FadeOut(v1_texts, run_time=1.25),
+            FadeOut(v2_texts, run_time=1.25),
+            FadeIn(res_texts, run_time=1.25),
+        ))
+        self.wait(1)
+
+
+class MinEPU16(Scene):
+    def construct(self):
+        title = Text("_mm_min_epu16")
+        title2 = Text("逐元素 uint16 求最小值", font_size=32).shift(DOWN * 0.65)
+        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+        self.wait(1)
+        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+        v1 = np.array([500, 1200, -300, -1500, -600, -700, -50, 800], dtype=np.uint16) * 40
+        v2 = np.array([-40, 840, -480, -720, 90, -1000, 20, -960], dtype=np.uint16) * 50
+        res = np.minimum(v1.astype(np.uint16), v2.astype(np.uint16)).astype(np.uint16)
+
+        hwps = dict(**globals()['hwps'])
+        hwps['width'] /= 1.7
+        n = globals()['n'] * 2
+        opacities = opacities2
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.25).shift(UP)
+        v1_texts = Group(*[Text(str(v1[i]), font_size=36).move_to(v1_rects[i]) for i in range(n)])
+        v2_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.25).shift(DOWN)
+        v2_texts = Group(*[Text(str(v2[i]), font_size=36).move_to(v2_rects[i]) for i in range(n)])
+        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.25)
+        res_texts = Group(*[Text(str(res[i]), font_size=36).move_to(res_rects[i]) for i in range(n)])
+        op_texts = Group(*[Text("MIN", font_size=32).move_to(res_rects[i]) for i in range(n)])
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(v1_texts),
+            FadeIn(v2_rects),
+            FadeIn(v2_texts),
+        ))
+        self.wait(0.75)
+        self.play(FadeIn(op_texts))
+        self.wait(0.8)
+        self.play(FadeOut(op_texts))
+
+        self.wait(0.6)
+        animations = []
+        for i in range(n):
+            if res[i] == v1[i]:
+                animations.append(v1_texts[i].animate.shift(0.25 * UP))
+            if res[i] == v2[i]:
+                animations.append(v2_texts[i].animate.shift(0.25 * UP))
+        self.play(AnimationGroup(*animations), run_time=0.25)
+        self.wait(0.2)
+        animations = []
+        for i in range(n):
+            if res[i] == v1[i]:
+                animations.append(v1_texts[i].animate.shift(0.25 * DOWN))
+            if res[i] == v2[i]:
+                animations.append(v2_texts[i].animate.shift(0.25 * DOWN))
+        self.play(AnimationGroup(*animations), run_time=0.25)
+        self.wait(0.8)
+
+        self.play(AnimationGroup(
+            v1_rects.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
+            v2_rects.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
+            v1_texts.animate(lag_ratio=0.4, run_time=2.5).shift(DOWN),
+            v2_texts.animate(lag_ratio=0.4, run_time=2.5).shift(UP),
+        ))
+        self.play(AnimationGroup(
+            FadeOut(v1_texts, run_time=1.25),
+            FadeOut(v2_texts, run_time=1.25),
+            FadeIn(res_texts, run_time=1.25),
+        ))
+        self.wait(1)
+
+
+class MinposEPU16(Scene):
+    def construct(self):
+        title = Text("_mm_minpos_epu16")
+        title2 = Text("求 8 个 uint16 的最小值（水平），并记录最小值所在的下标（0到7）", font_size=32).shift(DOWN * 0.65)
+        self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+        self.wait(1)
+        self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+        v1 = np.array([500, 1200, 300, 1500, 600, 700, 300, 800], dtype=np.uint16) // 10
+        res = np.argmin(v1.astype(np.uint16))
+
+        hwps = dict(**globals()['hwps'])
+        hwps['width'] /= 1.7
+        n = globals()['n'] * 2
+        opacities = opacities2
+
+        v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.25).shift(UP)
+        v1_texts = Group(*[Text(str(v1[i])).move_to(v1_rects[i]) for i in range(n)])
+        res_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=RED) for i in range(n)]).arrange(endian, buff=0.25)
+        res_texts = Group(*[Text(str(res if i == 1 else v1[res] if i == 0 else 0)).move_to(res_rects[i]) for i in range(n)])
+        ind_texts = Group(*[Text(str(i)).move_to(res_rects[i]).shift(DOWN * 0.65) for i in range(n)])
+        op_text = Text("ARGMIN").shift(DOWN * 1.95)
+
+        self.play(AnimationGroup(
+            FadeIn(v1_rects),
+            FadeIn(v1_texts),
+            FadeIn(ind_texts),
+        ))
+        self.wait(0.75)
+        self.play(FadeIn(op_text))
+        self.wait(0.8)
+        self.play(FadeOut(op_text))
+
+        self.wait(0.6)
+        animations = []
+        animations.append(v1_texts[res].animate.shift(0.25 * UP))
+        animations.append(ind_texts[res].animate.shift(0.25 * UP))
+        self.play(AnimationGroup(*animations), run_time=0.25)
+        self.wait(0.2)
+        animations = []
+        animations.append(v1_texts[res].animate.shift(0.25 * DOWN))
+        animations.append(ind_texts[res].animate.shift(0.25 * DOWN))
+        self.play(AnimationGroup(*animations), run_time=0.25)
+        self.wait(0.8)
+
+        animations = []
+        for i in range(n):
+            if i != res:
+                animations.append(FadeOut(ind_texts[i]))
+                animations.append(FadeOut(v1_texts[i]))
+                animations.append(FadeOut(v1_rects[i]))
+        self.play(AnimationGroup(*animations))
+
+        animations = []
+        animations.append(Transform(v1_texts[res], res_texts[0]))
+        animations.append(Transform(v1_rects[res], res_rects[0]))
+        animations.append(Transform(ind_texts[res], res_texts[1]))
+        self.play(AnimationGroup(*animations), run_time=1.4)
+
+        animations = []
+        for i in range(1, n):
+            animations.append(FadeIn(res_rects[i]))
+        for i in range(2, n):
+            animations.append(FadeIn(res_texts[i]))
+        self.play(AnimationGroup(*animations))
+
+        self.wait(1)
+
+
 class MovehdupPS(Scene):
     def construct(self):
         title = Text("_mm_movehdup_ps")
@@ -1785,3 +1898,72 @@ class MoveldupPS(Scene):
             *[FadeOut(v1_rects[i], run_time=2) for i in reversed(range(n)) if i % 2 == 1],
         ))
         self.wait(1.25)
+
+
+if 0:
+    class SetEPI32(Scene):
+        def construct(self):
+            title = Text("_mm_set_epi32")
+            title2 = Text("单独设置 4 个 int32 分量", font_size=32).shift(DOWN * 0.65)
+            self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+            self.wait(0.85)
+            self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+            arg_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=GREEN) for i in range(n)]).arrange(endian, buff=0.5).shift(DOWN)
+            arg_texts = Group(*[MathTex('xyzw'[i]).move_to(arg_rects[i]) for i in range(n)])
+            v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(UP)
+
+            self.play(AnimationGroup(
+                FadeIn(arg_texts),
+                FadeIn(v1_rects),
+            ))
+            self.wait(0.55)
+
+            for i in range(n):
+                self.play(arg_texts[i].animate.move_to(v1_rects[i]), run_time=0.75)
+            self.wait(1)
+
+
+    class Set1EPI32(Scene):
+        def construct(self):
+            title = Text("_mm_set1_epi32")
+            title2 = Text("全部 int32 元素设为同一个值", font_size=32).shift(DOWN * 0.65)
+            self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+            self.wait(0.85)
+            self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+            arg_texts = Group(*[MathTex('x').shift(1.25 * DOWN) for i in range(n)])
+            v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(UP)
+
+            self.play(AnimationGroup(
+                FadeIn(arg_texts),
+                FadeIn(v1_rects),
+            ))
+            self.wait(0.85)
+
+            for i in range(n):
+                self.play(arg_texts[i].animate.move_to(v1_rects[i]), run_time=0.7)
+                self.wait(0.1)
+            self.wait(1)
+
+
+    class SetzeroSI128(Scene):
+        def construct(self):
+            title = Text("_mm_setzero_si128")
+            title2 = Text("全部元素设为零", font_size=32).shift(DOWN * 0.65)
+            self.play(AnimationGroup(Write(title), Write(title2), run_time=1.25))
+            self.wait(0.85)
+            self.play(AnimationGroup(FadeOut(title2), title.animate.shift(UP * 3.5)), run_time=0.25)
+
+            arg_texts = Group(*[MathTex('0').shift(1.25 * DOWN) for i in range(n)])
+            v1_rects = Group(*[Rectangle(**hwps, fill_opacity=opacities[i], fill_color=BLUE) for i in range(n)]).arrange(endian, buff=0.5).shift(UP)
+
+            self.play(AnimationGroup(
+                FadeIn(arg_texts),
+                FadeIn(v1_rects),
+            ))
+            self.wait(0.8)
+
+            for i in range(n):
+                self.play(arg_texts[i].animate.move_to(v1_rects[i]), run_time=0.75)
+            self.wait(1)

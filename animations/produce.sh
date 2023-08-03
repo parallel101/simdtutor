@@ -9,7 +9,7 @@ __EOF__
 chmod +x /tmp/.W$$.tmpbin/ffmpeg
 export PATH=/tmp/.W$$.tmpbin/ffmpeg:"$PATH"
 scenes=$(cat scene.py | sed -n '/^class \(\w\+\)(Scene):$/p' | sed 's/^class \(\w\+\)(Scene):$/\1/g')
-if true; then
+if false; then
     python -O -m manim -qh scene.py $scenes
     # for x in $scenes; do
     #     echo python -O -m manim -qh scene.py $x >> /tmp/.W$$.cmdlist.txt

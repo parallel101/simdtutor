@@ -1,0 +1,4 @@
+*.pyd
+*.so
+fast_mask.cpp
+build
