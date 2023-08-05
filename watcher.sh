@@ -40,7 +40,7 @@ do
                     cat "$file" | sed '/\#include <gtest\/gtest.h>/d; /^TEST(\w\+, \w\+) {$/,/^}$/d' | "$cc" -x c++ /dev/stdin $cflags -o /tmp/.W$$.executable.out -lbenchmark -lbenchmark_main 2> /tmp/.W$$.gcc-error.log
                     if [ -f /tmp/.W$$.executable.out ]
                     then
-                        /tmp/.W$$.executable.out --benchmark_min_time=0.2 --benchmark_repetitions=5 --benchmark_out="$result" 2>&1 | tee "$bench"
+                        /tmp/.W$$.executable.out --benchmark_min_time=0.2s --benchmark_repetitions=5 --benchmark_out="$result" 2>&1 | tee "$bench"
                         if [ x"$?" == x0 ]
                         then
                             # sed '/^\#include <benchmark\/benchmark.h>$/d; /^\#include <gtest\/gtest.h>$/d' "$file" | sed -n '/^\(\#include\|namespace \w\+ =\|using namespace \)/p' | sed '$a' > "$bench"
