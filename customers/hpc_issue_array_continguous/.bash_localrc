@@ -1,0 +1,1 @@
+alias cmr='python setup.py build_ext --inplace && python speed_test.py'

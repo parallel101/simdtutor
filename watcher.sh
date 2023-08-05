@@ -21,7 +21,7 @@ do
         lastmd5="$newmd5"
         rm -f /tmp/.W$$.gcc-error.log
         echo '-- Compiling...'
-        cat "$file" | sed '/\#include <benchmark\/benchmark.h>/d; /^static void \w\+(benchmark::State/,/^BENCHMARK(\w\+)/d' | sed '/\#include <gtest\/gtest.h>/d; /^TEST(\w\+, \w\+) {$/,/^}$/d' | "$cc" -S -x c++ /dev/stdin $cflags -o /dev/stdout 2> /tmp/.W$$.gcc-error.log | sed '/^\t\..*[^:]$/d' | sed 's/\t/  /g' | sed '$a ; '"$(date +'Compiled at %Y\/%m\/%d %H:%M:%S')" | tee "$out"
+        cat "$file" | sed '/\#include <benchmark\/benchmark.h>/d; /^static void \w\+(benchmark::State/,/^BENCHMARK(\w\+)/d' | sed '/\#include <gtest\/gtest.h>/d; /^TEST(\w\+, \w\+) {$/,/^}$/d' | "$cc" -S -x c++ /dev/stdin $cflags -o /dev/stdout 2> /tmp/.W$$.gcc-error.log | sed 's/^\t\.\(align\|byte\|short\|long\|float\|quad\|rept\|string\|ascii\|asciz\)\t/  \.\1  /g' | sed '/^\t\..*[^:]$/d' | sed 's/\t/  /g' | sed '$a ; '"$(date +'Compiled at %Y\/%m\/%d %H:%M:%S')" | tee "$out"
         if [ -s /tmp/.W$$.gcc-error.log ]
         then
             cat /tmp/.W$$.gcc-error.log >> "$out"
@@ -44,7 +44,7 @@ do
                         if [ x"$?" == x0 ]
                         then
                             # sed '/^\#include <benchmark\/benchmark.h>$/d; /^\#include <gtest\/gtest.h>$/d' "$file" | sed -n '/^\(\#include\|namespace \w\+ =\|using namespace \)/p' | sed '$a' > "$bench"
-                            sed -n '/^\/\/ BEGIN CODE$/,/^\/\/ END CODE$/p;' "$file" | sed '1d; $d' | python process.py "$result" "$record" > "$bench"
+                            sed -n '/^\/\/ BEGIN CODE$/,/^\/\/ END CODE$/p;' "$file" | sed '1d; $d' | python .watcher-helper.py "$result" "$record" > "$bench"
                         fi
                     else
                         cat /tmp/.W$$.gcc-error.log | tee "$bench"

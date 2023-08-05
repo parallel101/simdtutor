@@ -1,0 +1,5 @@
+*.pyd
+*.so
+build
+fast_concat.cpp
+__pycache__
