@@ -1,9 +1,7 @@
 #if _
 
-// 591 ns 0.29 cpi 90.39 GB/s
+// 557 ns 0.27 cpi 95.95 GB/s
 void imagemask(uint8_t const *img, uint8_t const *mask, size_t n, uint8_t *out) {
-    __m256i one = _mm256_set1_epi8(1);
-
     const size_t width = 256 / 8; // =32 uint8 per batch
     size_t batch = n / width;
         
@@ -25,22 +23,21 @@ void imagemask(uint8_t const *img, uint8_t const *mask, size_t n, uint8_t *out) 
     // shufmask3 = LLMMMNNNOOOPPPQQQRRRSSSTTTUUUVVV
     // 则 img_1 & shufmask1 就能起到和分别对 HWC 格式的前三分之一 rgb 进行 mask 一样的效果，依次类推
     while (vectorResult != vectorResult_end) {
-        __m256i vec_mask = _mm256_loadu_si256((__m256i*) vectorMASK);
+        __m256i maskorig = _mm256_loadu_si256((__m256i*) vectorMASK);
         vectorMASK += width;
-        __m256i maskorig = _mm256_sub_epi8(vec_mask, one);
         __m256i shufmask2 = _mm256_shuffle_epi8(maskorig, shuf31);
 
         __m256i vec_img_1 = _mm256_loadu_si256((__m256i*) vectorIMG);
         __m256i maskorig_ll = _mm256_broadcastsi128_si256(_mm256_castsi256_si128(maskorig));
         vectorIMG += width;
         __m256i shufmask1 = _mm256_shuffle_epi8(maskorig_ll, shuf12);
-        __m256i result_1 = _mm256_andnot_si256(shufmask1, vec_img_1);
+        __m256i result_1 = _mm256_and_si256(shufmask1, vec_img_1);
         _mm256_storeu_si256((__m256i*) vectorResult, result_1);
         vectorResult += width;
 
         __m256i maskorig_hh = _mm256_broadcastsi128_si256(_mm256_extracti128_si256(maskorig, 1));
         __m256i vec_img_2 = _mm256_loadu_si256((__m256i*) vectorIMG);
-        __m256i result_2 = _mm256_andnot_si256(shufmask2, vec_img_2);
+        __m256i result_2 = _mm256_and_si256(shufmask2, vec_img_2);
         vectorIMG += width;
         _mm256_storeu_si256((__m256i*) vectorResult, result_2);
 
@@ -48,7 +45,7 @@ void imagemask(uint8_t const *img, uint8_t const *mask, size_t n, uint8_t *out) 
         vectorResult += width;
         __m256i vec_img_3  = _mm256_loadu_si256((__m256i*) vectorIMG);
         vectorIMG += width;
-        __m256i result_3 = _mm256_andnot_si256(shufmask3, vec_img_3);
+        __m256i result_3 = _mm256_and_si256(shufmask3, vec_img_3);
         _mm256_storeu_si256((__m256i*) vectorResult, result_3);
         vectorResult += width;
     }
@@ -60,9 +57,9 @@ void imagemask(uint8_t const *img, uint8_t const *mask, size_t n, uint8_t *out) 
             uint8_t r = *vectorIMG++;
             uint8_t g = *vectorIMG++;
             uint8_t b = *vectorIMG++;
-            *vectorResult++ = r * mask;
-            *vectorResult++ = g * mask;
-            *vectorResult++ = b * mask;
+            *vectorResult++ = r & mask;
+            *vectorResult++ = g & mask;
+            *vectorResult++ = b & mask;
         }
     }
 }

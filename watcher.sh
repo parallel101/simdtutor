@@ -1,5 +1,5 @@
 #!/bin/bash
-# Requirements: pacman -S inotify-tools gtest benchmark gcc python sed
+# Requirements: pacman -S inotify-tools gtest benchmark gcc python sed gdb
 
 file="main.cpp"
 out="/tmp/watched.s"
@@ -34,7 +34,7 @@ do
                 /tmp/.W$$.executable.out | tee "$bench"
                 if [ x"$?" == x0 ]
                 then
-                    sed -n '/^\/\/ BEGIN CODE$/,/^\/\/ END CODE$/p' "$file" | sed '1d; $d' | python .watcher-helper.py "$result" "$record" "$bench"
+                    # sed -n '/^\/\/ BEGIN CODE$/,/^\/\/ END CODE$/p' "$file" | sed '1d; $d' | python .watcher-helper.py "$result" "$record" "$bench"
                     echo '-- Benchmarking...'
                     rm -f /tmp/.W$$.executable.out
                     cat "$file" | sed '/\#include <gtest\/gtest.h>/d; /^TEST(\w\+, \w\+) {$/,/^}$/d' | "$cc" -x c++ /dev/stdin $cflags -o /tmp/.W$$.executable.out -lbenchmark -lbenchmark_main 2> /tmp/.W$$.gcc-error.log
@@ -48,6 +48,13 @@ do
                         fi
                     else
                         cat /tmp/.W$$.gcc-error.log | tee "$bench"
+                    fi
+                else
+                    echo '-- Debugging...'
+                    cat "$file" | sed '/\#include <benchmark\/benchmark.h>/d; /^static void \w\+(benchmark::State/,/^BENCHMARK(\w\+)/d' > /tmp/.W$$.debugsource.cpp && "$cc" -x c++ /tmp/.W$$.debugsource.cpp $cflags -O0 -ggdb -gstabs+ -o /tmp/.W$$.executable.out -lgtest -lgtest_main 2> /dev/null
+                    if [ -f /tmp/.W$$.executable.out ]
+                    then
+                        which gdb > /dev/null 2>&1 && gdb -q /tmp/.W$$.executable.out -ex 'set confirm off' -ex 'set debuginfod enabled off' -ex 'set auto-load safe-path /' -ex 'set pagination off' -ex 'set environment CK_FORK=no' -ex 'b testing::AssertionResult::failure_message' -ex r -ex bt -ex q || true
                     fi
                 fi
             else

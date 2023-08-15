@@ -78,7 +78,6 @@ static void bench(benchmark::State &s) {
     auto img = std::vector<uint8_t>(n * 3);
     auto mask = std::vector<uint8_t>(n);
     auto out = std::vector<uint8_t>(n * 3);
-    auto out2 = std::vector<uint8_t>(n * 3);
     std::generate(img.begin(), img.end(), [uni = std::uniform_int_distribution<uint8_t>(), rng = std::mt19937()] () mutable { return uni(rng); });
     std::generate(mask.begin(), mask.end(), [uni = std::uniform_int_distribution<uint8_t>(), rng = std::mt19937()] () mutable { return uni(rng); });
     for (auto _: s) {

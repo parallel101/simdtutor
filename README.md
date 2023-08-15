@@ -92,7 +92,7 @@ std::cout << "我的代码花了" << std::chrono::duration_cast<std::chrono::dur
 - L2 缓存：256 KB x 6
 - L3 缓存：12 MB
 - 内存：DDR4，32 GB（由两块 16 GB 组成）
-- 内存带宽：64 位 x 2 x 2667 MT/s
+- 内存带宽：64 位 x 2 x 2667 MT/s（理论上限 41.67 GB/s）
 - 显卡：GeForce RTX 2080 Mobile（显存 8 GB）
 
 ## 目录结构
