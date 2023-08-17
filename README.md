@@ -118,9 +118,9 @@ cp source/findp.cpp main.cpp  # 测试 findp 任务
 ## 实验需求
 
 - 硬件要求：支持 AVX2 的 x86 CPU，Intel 和 AMD 均可，8 GB 内存。
-- 硬件最低要求：64 位的 x86 CPU，Intel 和 AMD 均可，2 GB 内存。
+- 硬件最低要求：支持 SSE4.1 的 64 位的 x86 CPU，Intel 和 AMD 均可，2 GB 内存。
 
-> 注：所有 64 位 CPU 均支持 SSE，过老的硬件可能无法运行部分含 AVX 的实验代码。
+> 注：所有 64 位 CPU 均能支持到 SSE2，从 Haswell 架构开始的 CPU 都能支持到 AVX2。
 
 Linux 做实验所需包（以 Arch Linux 为例）：
 
