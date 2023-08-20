@@ -5,6 +5,39 @@
 #include <cstddef>
 #include <immintrin.h>
 
+#define MM_TRANSPOSE_3x4(__val0, __val1, __val2) do { \
+    const __m128i __mask8_0 = _mm_setr_epi8(0,3,6,9,12,15,1,4,7,10,13,2,5,8,11,14); \
+    const __m128i __mask8_1 = _mm_setr_epi8(2,5,8,11,14,0,3,6,9,12,15,1,4,7,10,13); \
+    const __m128i __mask8_2 = _mm_setr_epi8(1,4,7,10,13,2,5,8,11,14,0,3,6,9,12,15); \
+    __m128i __tmp0, __tmp1, __tmp2, __tmp3; \
+    __tmp0 = _mm_shuffle_epi8(__val0, __mask8_0); \
+    __tmp1 = _mm_shuffle_epi8(__val1, __mask8_1); \
+    __tmp2 = _mm_shuffle_epi8(__val2, __mask8_2); \
+    __tmp3 = _mm_slli_si128(__tmp0,10); \
+    __tmp3 = _mm_alignr_epi8(__tmp1,__tmp3, 10); \
+    __tmp3 = _mm_slli_si128(__tmp3, 5); \
+    __tmp3 = _mm_srli_si128(__tmp3, 5); \
+    __val0 = _mm_slli_si128(__tmp2, 11); \
+    __val0 = _mm_or_si128(__val0,__tmp3); \
+    __tmp3 = _mm_slli_si128(__tmp0, 5); \
+    __tmp3 = _mm_srli_si128(__tmp3, 11); \
+    __val1 = _mm_srli_si128(__tmp1,5); \
+    __val1 = _mm_slli_si128(__val1, 5); \
+    __val1 = _mm_or_si128(__val1,__tmp3); \
+    __val1 =  _mm_slli_si128(__val1,5); \
+    __val1 = _mm_srli_si128(__val1, 5); \
+    __tmp3 = _mm_srli_si128(__tmp2,5); \
+    __tmp3 = _mm_slli_si128(__tmp3,11); \
+    __val1 = _mm_or_si128(__val1,__tmp3); \
+    __tmp3 = _mm_srli_si128(__tmp2,10); \
+    __tmp3 = _mm_slli_si128(__tmp3,10); \
+    __val2 = _mm_srli_si128(__tmp1,11); \
+    __val2 = _mm_slli_si128(__val2,5); \
+    __val2 = _mm_or_si128(__val2,__tmp3); \
+    __tmp0 = _mm_srli_si128(__tmp0, 11); \
+    __val2 = _mm_or_si128(__val2,__tmp0); \
+} while (0)
+
 // BEGIN CODE
 void simd_rgba2rgb(uint8_t const *in_rgba, uint8_t *out_rgb, size_t n) {
     const __m128i shuf1 = _mm_setr_epi8(0,1,2,4,5,6,8,9,10,12,13,14,3,7,11,15);
