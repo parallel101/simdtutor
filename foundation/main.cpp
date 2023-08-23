@@ -9,7 +9,10 @@
 #include "dispatch_kernel.h"
 #include "ScopeProfiler.h"
 #include "simd_print.h"
+#include "kernel_hashrng.h"
+#include "kernel_rgba2rgb.h"
 
+#if 0
 #define _MM_SHUFFLER(w, x, y, z) _MM_SHUFFLE(z, y, x, w)
 
 int main() {
@@ -73,3 +76,4 @@ int main() {
         print(b);
     }
 }
+#endif
