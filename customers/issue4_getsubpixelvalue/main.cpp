@@ -1,3 +1,5 @@
+#include <cmath>
+
 // 以下是项目中的一段热点代码
 // 会调用这个函数很多次，用来计算亚像素的像素值，方法是插值（具体算法可以不用管），里头的具体魔数我改了一下，因为是公司的代码，而且跟优化没有关系
 
@@ -43,22 +45,25 @@ double GetSubPixelValue(const double* preCaculatedParameter, int width, int heig
 	int height2 = 2 * height - 2;
 	for (int i = 0; i < 5; i++)
 	{
-		xIndex[i] = (xIndex[i] < 0) ? (-xIndex[i] - width2 * ((-xIndex[i]) / width2)) : (xIndex[i] - width2 * (xIndex[i] / width2));
-		if (width <= xIndex[i])
-			xIndex[i] = width2 - xIndex[i];
+		xIndex[i] = abs(xIndex[i]);
+		xIndex[i] = xIndex[i] - width2 * (xIndex[i] / width2);
+        xIndex[i] = width <= xIndex[i] ? width2 - xIndex[i] : xIndex[i];
 
-		yIndex[i] = (yIndex[i] < 0) ? (-yIndex[i] - height2 * ((-yIndex[i]) / height2)) : (yIndex[i] - height2 * (yIndex[i] / height2));
-		if (height <= yIndex[i])
-			yIndex[i] = height2 - yIndex[i];
+		xIndex[i] = abs(xIndex[i]);
+		yIndex[i] = yIndex[i] - height2 * (yIndex[i] / height2);
+		yIndex[i] = height <= yIndex[i] ? height2 - yIndex[i] : yIndex[i];
 	}
 
-	double result = 0;
+	double result = 0.0;
 	for (int i = 0; i < 5; i++)
 	{
+        const double * rowPointer = preCaculatedParameter + width * yIndex[i];
+        double rowResult = 0.0;
 		for (int j = 0; j < 5; j++)
 		{
-			result += ((*(preCaculatedParameter + width * yIndex[i] + xIndex[j])) * xWeight[j] * yWeight[i]);
+			result += rowPointer[xIndex[j]] * xWeight[j];
 		}
+        result += rowResult * yWeight[i];
 	}
 	return result;
 }
