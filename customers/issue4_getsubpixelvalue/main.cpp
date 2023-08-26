@@ -83,13 +83,16 @@ int main() {
 		xs[i] = rand() % 2048;
 		ys[i] = rand() % 2048;
 	}
-	std::vector<double> result(1);
+	std::vector<double> result(TEST_NUM);
 
 	TICK(t);
 	for (int i = 0; i < TEST_NUM; i++)
 	{
-		result[0] = GetSubPixelValue(preCaculatedParameter.data(), width, height, xs[i], ys[i]);
+		result[i] = GetSubPixelValue(preCaculatedParameter.data(), width, height, xs[i], ys[i]);
 	}
+#ifdef __GNUC__
+        asm volatile ("mov %0, %0" :: "g" (result.data()) : "cc", "memory");
+#endif
 	TOCK(t);
 
 	return 0;
