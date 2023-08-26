@@ -6,7 +6,7 @@
 // 以下是项目中的一段热点代码
 // 会调用这个函数很多次，用来计算亚像素的像素值，方法是插值（具体算法可以不用管），里头的具体魔数我改了一下，因为是公司的代码，而且跟优化没有关系
 
-void GetSubPixelValue(double *Rs, const double* preCaculatedParameter, int width, int height, double *Xs, double *Ys)
+void GetSubPixelValue(double *__restrict Rs, const double*__restrict preCaculatedParameter, int width, int height, double *__restrict Xs, double *__restrict Ys)
 {
     auto c0_5 = _mm256_set1_pd(0.5);
     auto X = _mm256_loadu_pd(Xs);
@@ -56,31 +56,36 @@ void GetSubPixelValue(double *Rs, const double* preCaculatedParameter, int width
     xWeight[4] = _mm256_fmadd_pd(c0_111, xw4, _mm256_fmadd_pd(xw3, c1o22, _mm256_fmadd_pd(c0_233, xw2, _mm256_fmadd_pd(c0_344, xw, c0_345))));
     yWeight[4] = _mm256_fmadd_pd(c0_111, yw4, _mm256_fmadd_pd(yw3, c1o22, _mm256_fmadd_pd(c0_233, yw2, _mm256_fmadd_pd(c0_344, yw, c0_345))));
 
-	int width2 = 2 * width - 2;
-	int height2 = 2 * height - 2;
-    auto v_width = _mm_set1_epi32(width);
-    auto v_height = _mm_set1_epi32(height);
-    auto v_width2 = _mm256_set1_pd((double)width2);
-    auto v_height2 = _mm256_set1_pd((double)height2);
-    auto v_width2i = _mm_set1_epi32(width2);
-    auto v_height2i = _mm_set1_epi32(height2);
+	/* int width2 = 2 * width - 2; */
+	/* int height2 = 2 * height - 2; */
+	/*     auto v_width = _mm_set1_epi32(width); */
+	/*     auto v_height = _mm_set1_epi32(height); */
+	/*     auto v_width2 = _mm256_set1_pd((double)width2); */
+	/*     auto v_height2 = _mm256_set1_pd((double)height2); */
+	/*     auto v_width2i = _mm_set1_epi32(width2); */
+	/*     auto v_height2i = _mm_set1_epi32(height2); */
 	__m128i xIndex[5];
 	__m128i yIndex[5];
     auto vi = _mm_setzero_si128();
     auto c1 = _mm_set1_epi64x(1);
+    auto wmask = _mm_set1_epi32(2047);
+    auto hmask = _mm_set1_epi32(2047);
+      #pragma GCC unroll 5
 	for (int i = 0; i < 5; i++)
 	{
         auto xIndexI = _mm_sub_epi32(xIndex2, vi);
         vi = _mm_add_epi32(vi, c1);
-		xIndexI = _mm_abs_epi32(xIndexI);
-		xIndexI = _mm_sub_epi32(xIndexI, _mm256_cvttpd_epi32(_mm256_mul_pd(v_width2, _mm256_floor_pd(_mm256_div_pd(_mm256_cvtepi32_pd(xIndexI), v_width2)))));
-        xIndexI = _mm_blendv_epi8(xIndexI, _mm_sub_epi32(v_width2i, xIndexI), _mm_or_si128(_mm_cmpgt_epi32(xIndexI, v_width), _mm_cmpeq_epi32(xIndexI, v_width)));
-        auto yIndexI = yIndex2;
+        xIndexI = _mm_and_si128(xIndexI, wmask);
+		/* xIndexI = _mm_abs_epi32(xIndexI); */
+		/* xIndexI = _mm_sub_epi32(xIndexI, _mm256_cvttpd_epi32(_mm256_mul_pd(v_width2, _mm256_floor_pd(_mm256_div_pd(_mm256_cvtepi32_pd(xIndexI), v_width2))))); */
+		/*         xIndexI = _mm_blendv_epi8(xIndexI, _mm_sub_epi32(v_width2i, xIndexI), _mm_or_si128(_mm_cmpgt_epi32(xIndexI, v_width), _mm_cmpeq_epi32(xIndexI, v_width))); */
         xIndex[i] = xIndexI;
-		yIndexI = _mm_abs_epi32(yIndexI);
-		yIndexI = _mm_sub_epi32(yIndexI, _mm256_cvttpd_epi32(_mm256_mul_pd(v_height2, _mm256_floor_pd(_mm256_div_pd(_mm256_cvtepi32_pd(yIndexI), v_height2)))));
-        yIndexI = _mm_blendv_epi8(yIndexI, _mm_sub_epi32(v_height2i, yIndexI), _mm_or_si128(_mm_cmpgt_epi32(yIndexI, v_height), _mm_cmpeq_epi32(yIndexI, v_height)));
-        yIndexI = _mm_mullo_epi32(yIndexI, v_height);
+        auto yIndexI = yIndex2;
+        yIndexI = _mm_and_si128(xIndexI, hmask);
+		/* yIndexI = _mm_abs_epi32(yIndexI); */
+		/* yIndexI = _mm_sub_epi32(yIndexI, _mm256_cvttpd_epi32(_mm256_mul_pd(v_height2, _mm256_floor_pd(_mm256_div_pd(_mm256_cvtepi32_pd(yIndexI), v_height2))))); */
+		/*         yIndexI = _mm_blendv_epi8(yIndexI, _mm_sub_epi32(v_height2i, yIndexI), _mm_or_si128(_mm_cmpgt_epi32(yIndexI, v_height), _mm_cmpeq_epi32(yIndexI, v_height))); */
+        yIndexI = _mm_slli_epi32(yIndexI, 11); // *2048
         yIndex[i] = yIndexI;
 	}
 
@@ -88,9 +93,11 @@ void GetSubPixelValue(double *Rs, const double* preCaculatedParameter, int width
 	for (int i = 0; i < 5; i++)
 	{
         auto rowResult = _mm256_setzero_pd();
+        auto yIndexI = yIndex[i];
+      #pragma GCC unroll 5
 		for (int j = 0; j < 5; j++)
 		{
-            auto factor = _mm256_i32gather_pd(preCaculatedParameter, _mm_add_epi32(yIndex[i], xIndex[j]), 1);
+            auto factor = _mm256_i32gather_pd(preCaculatedParameter, _mm_add_epi32(yIndexI, xIndex[j]), 1);
             rowResult = _mm256_fmadd_pd(rowResult, factor, xWeight[j]);
 		}
         result = _mm256_fmadd_pd(result, rowResult, yWeight[i]);
