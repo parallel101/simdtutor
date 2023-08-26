@@ -68,14 +68,15 @@ void GetSubPixelValue(double *__restrict Rs, const double*__restrict preCaculate
 #endif
 	__m128i xIndex[5];
 	__m128i yIndex[5];
-    auto vi = _mm_setzero_si128();
+    auto vi = _mm_set1_epi64x(-2);
     auto c1 = _mm_set1_epi64x(1);
+#ifdef USE_BIT
     auto wmask = _mm_set1_epi32(2047);
     auto hmask = _mm_set1_epi32(2047);
-      #pragma GCC unroll 5
+#endif
 	for (int i = 0; i < 5; i++)
 	{
-        auto xIndexI = _mm_sub_epi32(xIndex2, vi);
+        auto xIndexI = _mm_add_epi32(xIndex2, vi);
         vi = _mm_add_epi32(vi, c1);
       #ifdef USE_BIT
         xIndexI = _mm_and_si128(xIndexI, wmask);
@@ -83,19 +84,17 @@ void GetSubPixelValue(double *__restrict Rs, const double*__restrict preCaculate
 		xIndexI = _mm_abs_epi32(xIndexI);
 		xIndexI = _mm_sub_epi32(xIndexI, _mm256_cvttpd_epi32(_mm256_mul_pd(v_width2, _mm256_floor_pd(_mm256_div_pd(_mm256_cvtepi32_pd(xIndexI), v_width2)))));
 		        xIndexI = _mm_blendv_epi8(xIndexI, _mm_sub_epi32(v_width2i, xIndexI), _mm_or_si128(_mm_cmpgt_epi32(xIndexI, v_width), _mm_cmpeq_epi32(xIndexI, v_width)));
-        xIndex[i] = xIndexI;
       #endif
+        xIndex[i] = xIndexI;
         auto yIndexI = yIndex2;
       #ifdef USE_BIT
         yIndexI = _mm_and_si128(xIndexI, hmask);
+        yIndexI = _mm_slli_epi32(yIndexI, 11);
       #else
 		yIndexI = _mm_abs_epi32(yIndexI);
 		yIndexI = _mm_sub_epi32(yIndexI, _mm256_cvttpd_epi32(_mm256_mul_pd(v_height2, _mm256_floor_pd(_mm256_div_pd(_mm256_cvtepi32_pd(yIndexI), v_height2)))));
 		        yIndexI = _mm_blendv_epi8(yIndexI, _mm_sub_epi32(v_height2i, yIndexI), _mm_or_si128(_mm_cmpgt_epi32(yIndexI, v_height), _mm_cmpeq_epi32(yIndexI, v_height)));
         yIndexI = _mm_mullo_epi32(yIndexI, v_width);
-      #endif
-      #ifdef USE_BIT
-        yIndexI = _mm_slli_epi32(yIndexI, 11);
       #endif
         yIndex[i] = yIndexI;
 	}
@@ -139,13 +138,13 @@ int main() {
 	std::vector<double> result(TEST_NUM);
 
 	TICK(t);
-    #pragma omp parallel for
-	for (int i = 0; i < TEST_NUM; i += WIDTH)
+    /* #pragma omp parallel for */
+	for (size_t i = 0; i < TEST_NUM / WIDTH * WIDTH; i += WIDTH)
 	{
 		GetSubPixelValue(result.data() + i, preCaculatedParameter.data(), width, height, xs.data() + i, ys.data() + i);
 	}
 #ifdef __GNUC__
-        asm volatile ("mov %%rax, %0" :: "g" (result.data()) : "cc", "memory");
+        asm volatile ("" ::: "cc", "memory");
 #endif
 	TOCK(t);
 
