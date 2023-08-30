@@ -1,1 +1,3 @@
 original 418.72ms
+optimized 50.32ms
+parallel 21.99ms

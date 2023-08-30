@@ -1,20 +1,20 @@
-//********************************************************************************************
-//***********************************normal_calSimilarity.cpp********************************
-//********************************************************************************************
 #include <iostream>
+#include <immintrin.h>
+#include <atomic>
 #include <vector>
 #include <random>
 #include <fstream>
 #include <stdio.h>
 #include <chrono>
+#define REP4(x) (x, x, x, x)
 
 struct templateFeat
 {
-	int x;
-	int y;
-	short dx;
-	short dy;
-	float mag;
+	__m128i x;
+	__m128i y;
+	__m64 dx;
+	__m64 dy;
+	__m128 mag;
 };
 
 struct matchResult
@@ -48,16 +48,16 @@ bool saveDataToTxt(const std::string txt_path,const std::vector<matchResult> mat
     return true;
 }
 
-std::vector<matchResult> calSimilarity(const std::vector<templateFeat> template_point,const std::vector<searchFeat> search_point)
+std::vector<matchResult> const &calSimilarity(const std::vector<templateFeat> &template_point,size_t template_feat_size,const std::vector<searchFeat> &search_point,int search_feat_size)
 {
-    int template_feat_size =  template_point.size();
-    int search_feat_size =  search_point.size();
-
-    std::vector<matchResult> results0Deg;
+    static std::vector<matchResult> results0Deg;
+    std::atomic<size_t> results0DegSize{0};
+    results0Deg.resize(1920 * 1200);
     float anMinScore     = 0.4 - 1;
     float NormMinScore   = 0.4 / template_feat_size;
     float NormGreediness = ((1 - 0.8 * 0.4) / (1 - 0.8)) / template_feat_size;
     
+    /* #pragma omp parallel for collapse(2) */
     for(int i = 0; i < 1920; i++)
     {
         for(int j = 0; j < 1200; j++)
@@ -66,67 +66,95 @@ std::vector<matchResult> calSimilarity(const std::vector<templateFeat> template_
             float PartialSum   = 0;
             int   SumOfCoords  = 0;
 
-            for(int m = 0; m < template_feat_size; m++)
+            auto $i = _mm_set1_epi32(i);
+            auto $j = _mm_set1_epi32(j);
+            auto $0 = _mm_setzero_si128();
+            auto $230 = _mm_set1_epi32(230);
+            auto $350 = _mm_set1_epi32(350);
+
+            for(int m = 0; m < template_feat_size / 4 * 4; m += 4)
             {
-                int curX = i + template_point[m].x;
-                int curY = j + template_point[m].y;
-				
-                if(curX < 0 || curY < 0 || curX > 230 || curY > 350)
-                {
+                auto $curX = _mm_add_epi32($i, template_point[m / 4].x);
+                auto $curY = _mm_add_epi32($j, template_point[m / 4].y);
+
+                auto $notok = _mm_or_si128(
+                    _mm_or_si128(_mm_cmplt_epi32($curX, $0), _mm_cmplt_epi32($curY, $0)),
+                    _mm_or_si128(_mm_cmpgt_epi32($curX, $230), _mm_cmpgt_epi32($curY, $350)));
+                if (0xffff == _mm_movemask_epi8($notok)) {
                     continue;
                 }
 
-                short iTx = template_point[m].dx;
-                short iTy = template_point[m].dy;
-                float iTm = template_point[m].mag;
+                auto $iTx = _mm_cvtpi16_ps(template_point[m / 4].dx);
+                auto $iTy = _mm_cvtpi16_ps(template_point[m / 4].dy);
+                auto $iTm = template_point[m / 4].mag;
 
-                int offSet = curY * 350 + curX;
-                short iSx        = search_point[offSet].dx;
-                short iSy        = search_point[offSet].dy; 
-                float iSm        = search_point[offSet].mag;
+                auto $offSet = _mm_andnot_si128($notok, _mm_add_epi32(_mm_mullo_epi32($curY, $350), $curX));
+                auto $iSxy = _mm_i32gather_epi32((int *)search_point.data(), $offSet, sizeof(searchFeat));
+                // isx isy isx isy isx isy isx isy
+                auto $iSx = _mm_cvtepi32_ps(_mm_srai_epi32(_mm_slli_epi32($iSxy, 16), 16));
+                auto $iSy = _mm_cvtepi32_ps(_mm_srai_epi32($iSxy, 16));
+                auto $iSm = _mm_i32gather_ps(1 + (float *)search_point.data(), $offSet, sizeof(searchFeat));
 
-                if((iSx != 0 || iSy != 0) && (iTx != 0 || iTy != 0))
-                {
-                    PartialSum += ((iSx * iTx) + (iSy * iTy)) * (iSm * iTm);
-                }
-                SumOfCoords  = m + 1;
+                auto $accum = _mm_andnot_ps(_mm_castsi128_ps($notok),
+                                            _mm_mul_ps(
+                                            _mm_mul_ps($iSm, $iTm),
+                                            _mm_add_ps(
+                                            _mm_mul_ps($iSx, $iTx),
+                                            _mm_mul_ps($iSy, $iTy))
+                                            ));
+                $accum = _mm_hadd_ps($accum, $accum);
+                $accum = _mm_hadd_ps($accum, $accum);
+                PartialSum += _mm_cvtss_f32($accum);
+                /* auto $cond = _mm_mul_ps($m1, */
+                /*                         _mm_min_ps( */
+                /*                         _mm_add_ps($anMinScore, _mm_mul_ps($NormGreediness, $m1)), */
+                /*                         _mm_mul_ps($NormMinScore, $m1))); */
+                /* for (int _ = 0; _ < 4; _++) */
+                /*      printf("%d %f %f %f %f %f %f %f %f %f %f %f\n", m + _, _mm_cvtepi32_ps($offSet)[_], _mm_cvtepi32_ps($curX)[_], _mm_cvtepi32_ps($curY)[_], $iSx[_], $iSy[_], $iTx[_], $iTy[_], $iSm[_], $iTm[_], $PartialSum[_], _mm_cvtepi32_ps($notok)[_]); */
+                /* exit(1); */
+
+                SumOfCoords  = m + 5;
                 PartialScore = PartialSum / SumOfCoords;
+
+                /* printf("%d %d %d %d %d %d %d %d %f %f %f\n", m, offSet, curX, curY, iSx, iSy, iTx, iTy, iSm, iTm, PartialSum); */
+                /* exit(1); */
+                /*  */
+                /* printf("%d %f %f\n", m, PartialSum, ((iSx * iTx) + (iSy * iTy)) * (iSm * iTm)); */
 
                 if(PartialScore < (std::min(anMinScore + NormGreediness * SumOfCoords, NormMinScore * SumOfCoords)))
                 {
                     break;
                 }
             }
-
-            if(PartialScore > 0.4)
+            if(PartialScore > 0.4f)
             {
-                results0Deg.push_back({i, j, 0, PartialScore});
-            } 
+                results0Deg[results0DegSize.fetch_add(1, std::memory_order_relaxed)] = {i, j, 0, PartialScore};
+            }
         }
     }
 
+    results0Deg.resize(results0DegSize.load(std::memory_order_relaxed));
     return results0Deg;
 }
 
 int main()
 {
     //为了测试函数而生成的随机数：template_point/search_point
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::mt19937 gen(0), gen1(1), gen2(2), gen3(3), gen4(4), gen5(5);
     std::uniform_int_distribution<int> intXDist(-18, 32);
     std::uniform_int_distribution<int> intYDist(-48, 49);
     std::uniform_int_distribution<short> shortDXDist(-348, 349);
     std::uniform_int_distribution<short> shortDYDist(-421, 352);
     std::uniform_real_distribution<float> floatDist(0.00237112f, 0.0120056f);
 
-    std::vector<templateFeat> template_point(215);
+    std::vector<templateFeat> template_point(216 / 4);
     for (auto &feat : template_point)
     {
-        feat.x = intXDist(gen);
-        feat.y = intYDist(gen);
-        feat.dx = shortDXDist(gen);
-        feat.dy = shortDYDist(gen);
-        feat.mag = floatDist(gen);
+        feat.x = _mm_set_epi32 REP4(intXDist(gen1));
+        feat.y = _mm_set_epi32 REP4(intYDist(gen2));
+        feat.dx = _mm_set_pi16 REP4(shortDXDist(gen3));
+        feat.dy = _mm_set_pi16 REP4(shortDYDist(gen4));
+        feat.mag = _mm_set_ps REP4(floatDist(gen5));
     }
 
     std::uniform_int_distribution<short> shortDxDist(-460, 460);
@@ -136,14 +164,15 @@ int main()
     std::vector<searchFeat> search_point(2304000);
     for (auto &feat : search_point)
     {
-        feat.dx = shortDxDist(gen);
-        feat.dy = shortDyDist(gen);
-        feat.mag = float_Dist(gen);
+        feat.dx = (shortDxDist(gen));
+        /* static int once = printf("%d\n", feat.dx); */
+        feat.dy = (shortDyDist(gen));
+        feat.mag = (float_Dist(gen));
     }
 
     //运行算法,计算耗时
     auto start = std::chrono::high_resolution_clock::now();
-    std::vector<matchResult> results0Deg = calSimilarity(template_point,search_point);
+    std::vector<matchResult> const &results0Deg = calSimilarity(template_point,216,search_point,2304000);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;
     std::cout << "Function took " << duration.count() << " milliseconds." << std::endl;
@@ -151,5 +180,5 @@ int main()
     //保存匹配结果
     saveDataToTxt("/tmp/match_result.txt",results0Deg);
 
-    return true;
+    return 0;
 }
