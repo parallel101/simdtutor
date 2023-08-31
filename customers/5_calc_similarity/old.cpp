@@ -126,7 +126,7 @@ int main()
     std::uniform_int_distribution<short> shortDYDist(-421, 352);
     std::uniform_real_distribution<float> floatDist(0.00237112f, 0.0120056f);
 
-    std::vector<templateFeat> template_point(216);
+    std::vector<templateFeat> template_point(215);
     for (auto &feat : template_point)
     {
         feat.x = intXDist(gen1);
