@@ -76,13 +76,13 @@ std::vector<matchResult> calSimilarity(const std::vector<templateFeat> template_
                     continue;
                 }
 
-                short iTx = template_point[m].dx;
-                short iTy = template_point[m].dy;
+                int iTx = template_point[m].dx;
+                int iTy = template_point[m].dy;
                 float iTm = template_point[m].mag;
 
                 int offSet = curY * 350 + curX;
-                short iSx        = search_point[offSet].dx;
-                short iSy        = search_point[offSet].dy; 
+                int iSx        = search_point[offSet].dx;
+                int iSy        = search_point[offSet].dy; 
                 float iSm        = search_point[offSet].mag;
 
                 if((iSx != 0 || iSy != 0) && (iTx != 0 || iTy != 0))
@@ -92,12 +92,12 @@ std::vector<matchResult> calSimilarity(const std::vector<templateFeat> template_
                 SumOfCoords  = m + 1;
                 PartialScore = PartialSum / SumOfCoords;
 
-                /* printf("%d %d %d %d %d %d %d %d %f %f %f\n", m, offSet, curX, curY, iSx, iSy, iTx, iTy, iSm, iTm, PartialSum); */
+                /* printf("%d %f %d %d %d %d %d %d %d %f %f %f\n", m, ((iSx * iTx) + (iSy * iTy)) * (iSm * iTm), offSet, curX, curY, iSx, iSy, iTx, iTy, iSm, iTm, PartialSum); */
                 /* exit(1); */
                 /*  */
                 /* printf("%d %f %f\n", m, PartialSum, ((iSx * iTx) + (iSy * iTy)) * (iSm * iTm)); */
 
-                if(m % 4 == 3 && PartialScore < (std::min(anMinScore + NormGreediness * SumOfCoords, NormMinScore * SumOfCoords)))
+                if(PartialScore < (std::min(anMinScore + NormGreediness * SumOfCoords, NormMinScore * SumOfCoords)))
                 {
                     break;
                 }
@@ -159,5 +159,5 @@ int main()
     //保存匹配结果
     saveDataToTxt("./match_result.txt",results0Deg);
 
-    return true;
+    return 0;
 }

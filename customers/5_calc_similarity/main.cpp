@@ -63,8 +63,8 @@ std::vector<matchResult> const &calSimilarity(const std::vector<templateFeat> &t
         for(int j = 0; j < 1200; j++)
         {
             float PartialScore = 0;
-            float PartialSum   = 0;
             int   SumOfCoords  = 0;
+            __m128 $PartialSum = _mm_setzero_ps();
 
             auto $i = _mm_set1_epi32(i);
             auto $j = _mm_set1_epi32(j);
@@ -84,47 +84,55 @@ std::vector<matchResult> const &calSimilarity(const std::vector<templateFeat> &t
                     continue;
                 }
 
-                auto $iTx = _mm_cvtpi16_ps(template_point[m / 4].dx);
-                auto $iTy = _mm_cvtpi16_ps(template_point[m / 4].dy);
+                auto $iTx = _mm_cvtepi16_epi32(_mm_set1_epi64(template_point[m / 4].dx));
+                auto $iTy = _mm_cvtepi16_epi32(_mm_set1_epi64(template_point[m / 4].dy));
                 auto $iTm = template_point[m / 4].mag;
 
                 auto $offSet = _mm_andnot_si128($notok, _mm_add_epi32(_mm_mullo_epi32($curY, $350), $curX));
                 auto $iSxy = _mm_i32gather_epi32((int *)search_point.data(), $offSet, sizeof(searchFeat));
                 // isx isy isx isy isx isy isx isy
-                auto $iSx = _mm_cvtepi32_ps(_mm_srai_epi32(_mm_slli_epi32($iSxy, 16), 16));
-                auto $iSy = _mm_cvtepi32_ps(_mm_srai_epi32($iSxy, 16));
+                auto $iSx = _mm_srai_epi32(_mm_slli_epi32($iSxy, 16), 16);
+                auto $iSy = _mm_srai_epi32($iSxy, 16);
                 auto $iSm = _mm_i32gather_ps(1 + (float *)search_point.data(), $offSet, sizeof(searchFeat));
 
                 auto $accum = _mm_andnot_ps(_mm_castsi128_ps($notok),
                                             _mm_mul_ps(
                                             _mm_mul_ps($iSm, $iTm),
-                                            _mm_add_ps(
-                                            _mm_mul_ps($iSx, $iTx),
-                                            _mm_mul_ps($iSy, $iTy))
-                                            ));
-                $accum = _mm_hadd_ps($accum, $accum);
-                $accum = _mm_hadd_ps($accum, $accum);
-                PartialSum += _mm_cvtss_f32($accum);
+                                            _mm_cvtepi32_ps(
+                                            _mm_add_epi32(
+                                            _mm_mullo_epi32($iSx, $iTx),
+                                            _mm_mullo_epi32($iSy, $iTy)))));
+                _mm_set1_ps(PartialSum) + $accum;
                 /* auto $cond = _mm_mul_ps($m1, */
                 /*                         _mm_min_ps( */
                 /*                         _mm_add_ps($anMinScore, _mm_mul_ps($NormGreediness, $m1)), */
                 /*                         _mm_mul_ps($NormMinScore, $m1))); */
                 /* for (int _ = 0; _ < 4; _++) */
-                /*      printf("%d %f %f %f %f %f %f %f %f %f %f %f\n", m + _, _mm_cvtepi32_ps($offSet)[_], _mm_cvtepi32_ps($curX)[_], _mm_cvtepi32_ps($curY)[_], $iSx[_], $iSy[_], $iTx[_], $iTy[_], $iSm[_], $iTm[_], $PartialSum[_], _mm_cvtepi32_ps($notok)[_]); */
+                /*      printf("%d %f %f %f %f %f %f %f %f %f %f %f\n", m + _, $accum[_], _mm_cvtepi32_ps($offSet)[_], _mm_cvtepi32_ps($curX)[_], _mm_cvtepi32_ps($curY)[_], _mm_cvtepi32_ps($iSx)[_], _mm_cvtepi32_ps($iSy)[_], _mm_cvtepi32_ps($iTx)[_], _mm_cvtepi32_ps($iTy)[_], $iSm[_], $iTm[_], _mm_cvtepi32_ps($notok)[_]); */
                 /* exit(1); */
 
-                SumOfCoords  = m + 5;
-                PartialScore = PartialSum / SumOfCoords;
+                $accum = _mm_add_ps($accum, _mm_castsi128_ps(_mm_bslli_si128(_mm_castps_si128($accum), 4)));
+                $accum = _mm_add_ps($accum, _mm_castsi128_ps(_mm_bslli_si128(_mm_castps_si128($accum), 8)));
 
-                /* printf("%d %d %d %d %d %d %d %d %f %f %f\n", m, offSet, curX, curY, iSx, iSy, iTx, iTy, iSm, iTm, PartialSum); */
-                /* exit(1); */
-                /*  */
-                /* printf("%d %f %f\n", m, PartialSum, ((iSx * iTx) + (iSy * iTy)) * (iSm * iTm)); */
+                bool breaks = false;
+                for (int mm = 0; mm < 4; mm++) {
+                    auto tmpPartialSum = PartialSum + $accum[mm];
+                    SumOfCoords  = m + mm + 1;
+                    PartialScore = tmpPartialSum / SumOfCoords;
 
-                if(PartialScore < (std::min(anMinScore + NormGreediness * SumOfCoords, NormMinScore * SumOfCoords)))
-                {
-                    break;
+                    /* printf("%d %d %d %d %d %d %d %d %f %f %f\n", m, offSet, curX, curY, iSx, iSy, iTx, iTy, iSm, iTm, PartialSum); */
+                    /* exit(1); */
+                    /*  */
+                    /* printf("%d %f %f\n", m, PartialSum, ((iSx * iTx) + (iSy * iTy)) * (iSm * iTm)); */
+
+                    if(PartialScore < (std::min(anMinScore + NormGreediness * SumOfCoords, NormMinScore * SumOfCoords)))
+                    {
+                        breaks = true;
+                        break;
+                    }
                 }
+                PartialSum += $accum[3];
+                if (breaks) break;
             }
             if(PartialScore > 0.4f)
             {
