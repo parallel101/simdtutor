@@ -24,7 +24,6 @@ struct templateFeat
 	float mag;
 };
 
-#ifdef USE_MULTISCORE
 struct templateFeatSimd
 {
 	__m128i x;
@@ -33,7 +32,6 @@ struct templateFeatSimd
 	__m64 dy;
 	__m128 mag;
 };
-#endif
 
 struct matchResult
 {
@@ -192,11 +190,7 @@ std::vector<matchResult> const &calSimilarity(const std::vector<templateFeat> &t
         for(int j = 0; j < 1200; j += 4)
         {
             auto $PartialSum   = _mm_setzero_ps();
-            #ifdef USE_FIRSTUNROLL
-            auto $SumOfCoords  = _mm_set1_epi32(2);
-            #else
             auto $SumOfCoords  = _mm_set1_epi32(1);
-            #endif
             auto $j = _mm_add_epi32(_mm_set1_epi32(j), _mm_setr_epi32(0, 1, 2, 3));
             auto $350 = _mm_set1_epi32(350);
             auto $loopterm = _mm_setzero_si128();
@@ -238,7 +232,6 @@ std::vector<matchResult> const &calSimilarity(const std::vector<templateFeat> &t
             int m = 0;
             #endif
 
-            #pragma GCC unroll 4
             for(;
                 m < template_feat_size;
                 m++, $SumOfCoords = _mm_add_epi32($SumOfCoords, _mm_andnot_si128($loopterm, _mm_set1_epi32(1)))
