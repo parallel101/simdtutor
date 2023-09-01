@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(main LANGUAGES CXX)
 
-add_executable(main main.cpp)
+add_executable(main old.cpp)
 
 find_package(OpenMP REQUIRED)
 target_link_libraries(main OpenMP::OpenMP_CXX)

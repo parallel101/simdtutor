@@ -32,7 +32,7 @@ struct searchFeat
 	float mag;
 };
 
-bool saveDataToTxt(const std::string txt_path,const std::vector<matchResult> match_result) {
+static bool saveDataToTxt(const std::string txt_path,const std::vector<matchResult> match_result) {
     std::ofstream file(txt_path);
 
     if (file.is_open()) {
@@ -48,7 +48,88 @@ bool saveDataToTxt(const std::string txt_path,const std::vector<matchResult> mat
     return true;
 }
 
-std::vector<matchResult> const &calSimilarity(const std::vector<templateFeat> &template_point,size_t template_feat_size,const std::vector<searchFeat> &search_point,int search_feat_size)
+static float multiScore(templateFeat const *template_point,
+                        searchFeat const *search_point,
+                        float const *thresholds,
+                        int template_feat_size,
+                        int search_feat_size,
+                        int i, int j,
+                        float PartialSumBase) {
+    auto $PartialScore = _mm_setzero_ps();
+    auto $PartialSum = _mm_set1_ps(PartialSumBase);
+    auto $SumOfCoords = _mm_setr_ps(-3, -2, -1, 0);
+    auto $4 = _mm_set1_ps(4);
+    auto $template_feat_size = _mm_set1_ps(template_feat_size);
+    auto $i = _mm_set1_epi32(i);
+    auto $j = _mm_set1_epi32(j);
+    auto $0 = _mm_setzero_si128();
+    auto $230 = _mm_set1_epi32(230);
+    auto $350 = _mm_set1_epi32(350);
+
+    for(int m = 4; m < ((template_feat_size + 3) & ~3); m += 4)
+        {
+        $SumOfCoords = _mm_add_ps($SumOfCoords, $4);
+
+        auto $curX = _mm_add_epi32($i, template_point[m / 4].x);
+        auto $curY = _mm_add_epi32($j, template_point[m / 4].y);
+
+        auto $notok = _mm_or_si128(_mm_or_si128(_mm_castps_si128(_mm_cmpge_ps($SumOfCoords, $template_feat_size)),
+                                                _mm_or_si128(_mm_cmplt_epi32($curX, $0), _mm_cmplt_epi32($curY, $0))),
+                                   _mm_or_si128(_mm_cmpgt_epi32($curX, $230), _mm_cmpgt_epi32($curY, $350)));
+        /* if (0xffff == _mm_movemask_epi8($notok)) { */
+        /*     continue; */
+        /* } */
+
+        auto $iTx = _mm_cvtepi16_epi32(_mm_set1_epi64(template_point[m / 4].dx));
+        auto $iTy = _mm_cvtepi16_epi32(_mm_set1_epi64(template_point[m / 4].dy));
+        auto $iTm = template_point[m / 4].mag;
+
+        auto $offSet = _mm_andnot_si128($notok, _mm_add_epi32(_mm_mullo_epi32($curY, $350), $curX));
+        auto $iSxy = _mm_i32gather_epi32((int *)search_point, $offSet, sizeof(searchFeat));
+        // isx isy isx isy isx isy isx isy
+        auto $iSx = _mm_srai_epi32(_mm_slli_epi32($iSxy, 16), 16);
+        auto $iSy = _mm_srai_epi32($iSxy, 16);
+        auto $iSm = _mm_i32gather_ps(1 + (float *)search_point, $offSet, sizeof(searchFeat));
+
+        auto $accum = _mm_andnot_ps(_mm_castsi128_ps($notok),
+                                    _mm_mul_ps(
+                                    _mm_mul_ps($iSm, $iTm),
+                                    _mm_cvtepi32_ps(
+                                    _mm_add_epi32(
+                                    _mm_mullo_epi32($iSx, $iTx),
+                                    _mm_mullo_epi32($iSy, $iTy)))));
+        /* auto $cond = _mm_mul_ps($m1, */
+        /*                         _mm_min_ps( */
+        /*                         _mm_add_ps($anMinScore, _mm_mul_ps($NormGreediness, $m1)), */
+        /*                         _mm_mul_ps($NormMinScore, $m1))); */
+        /* for (int _ = 0; _ < 4; _++) */
+        /*      printf("%d %f %f %f %f %f %f %f %f %f %f %f\n", m + _, $accum[_], _mm_cvtepi32_ps($offSet)[_], _mm_cvtepi32_ps($curX)[_], _mm_cvtepi32_ps($curY)[_], _mm_cvtepi32_ps($iSx)[_], _mm_cvtepi32_ps($iSy)[_], _mm_cvtepi32_ps($iTx)[_], _mm_cvtepi32_ps($iTy)[_], $iSm[_], $iTm[_], _mm_cvtepi32_ps($notok)[_]); */
+        /* exit(1); */
+
+        // 0 1 2 3 (HI)
+        $accum = _mm_add_ps($accum, _mm_castsi128_ps(_mm_bslli_si128(_mm_castps_si128($accum), 4)));
+        // 0 1+0 2+1 3+2
+        $accum = _mm_add_ps($accum, _mm_castsi128_ps(_mm_bslli_si128(_mm_castps_si128($accum), 8)));
+        // 0 1+0 2+1+0 3+2+1+0
+
+        $PartialScore = _mm_add_ps($PartialSum, $accum);
+        /* auto $cond = _mm_mul_ps($SumOfCoords, _mm_min_ps( */
+        /*     _mm_add_ps(_mm_set1_ps(anMinScore), _mm_mul_ps(_mm_set1_ps(NormGreediness), $SumOfCoords)), */
+        /*     _mm_mul_ps(_mm_set1_ps(NormMinScore), $SumOfCoords))); */
+        auto $cond = _mm_load_ps(thresholds + m);
+        auto $cmp = _mm_andnot_ps(_mm_castsi128_ps($notok), _mm_cmplt_ps($PartialScore, $cond));
+        int cmpmask = _mm_movemask_ps($cmp);
+        if (cmpmask) {
+        int bit = __builtin_ctz(cmpmask);
+        return $PartialScore[bit] / (m + bit + 1);
+        }
+        $PartialSum = _mm_add_ps($PartialSum, _mm_shuffle_ps($accum, $accum, 0xff));
+        }
+    $PartialScore = _mm_div_ps($PartialScore, $SumOfCoords);
+    return $PartialScore[(template_feat_size - 1) & 3];
+}
+
+static std::vector<matchResult> const &calSimilarity(const std::vector<templateFeat> &template_point,size_t template_feat_size,const std::vector<searchFeat> &search_point,int search_feat_size)
 {
     static std::vector<matchResult> results0Deg;
     std::atomic<size_t> results0DegSize{0};
@@ -69,81 +150,36 @@ std::vector<matchResult> const &calSimilarity(const std::vector<templateFeat> &t
     {
         for(int j = 0; j < 1200; j++)
         {
-            float PartialScore = -999999;
-            auto $PartialScore = _mm_setzero_ps();
-            auto $PartialSum = _mm_setzero_ps();
-            auto $SumOfCoords = _mm_setr_ps(-3, -2, -1, 0);
-            auto $4 = _mm_set1_ps(4);
-            auto $template_feat_size = _mm_set1_ps(template_feat_size);
-            auto $i = _mm_set1_epi32(i);
-            auto $j = _mm_set1_epi32(j);
-            auto $0 = _mm_setzero_si128();
-            auto $230 = _mm_set1_epi32(230);
-            auto $350 = _mm_set1_epi32(350);
+            float PartialSum = 0;
+            float PartialScore = 0;
+            int SumOfCoords = 0;
+            for (int m = 0; m < 4; m++) {
+                int curX = i + template_point[0].x[m];
+                int curY = j + template_point[0].y[m];
 
-            for(int m = 0; m < ((template_feat_size + 3) & ~3); m += 4)
-            {
-                $SumOfCoords = _mm_add_ps($SumOfCoords, $4);
+                auto notok = curX < 0 || curY < 0 || curX > 230 || curY > 350;
+                if (notok) continue;
 
-                auto $curX = _mm_add_epi32($i, template_point[m / 4].x);
-                auto $curY = _mm_add_epi32($j, template_point[m / 4].y);
+                int iTx = template_point[0].dx[m];
+                int iTy = template_point[0].dy[m];
+                float iTm = template_point[0].mag[m];
 
-                auto $notok = _mm_or_si128(_mm_or_si128(_mm_castps_si128(_mm_cmpge_ps($SumOfCoords, $template_feat_size)),
-                    _mm_or_si128(_mm_cmplt_epi32($curX, $0), _mm_cmplt_epi32($curY, $0))),
-                    _mm_or_si128(_mm_cmpgt_epi32($curX, $230), _mm_cmpgt_epi32($curY, $350)));
-                /* if (0xffff == _mm_movemask_epi8($notok)) { */
-                /*     continue; */
-                /* } */
+                int offSet = curY * 350 + curX;
+                int iSx        = search_point[offSet].dx;
+                int iSy        = search_point[offSet].dy; 
+                float iSm        = search_point[offSet].mag;
 
-                auto $iTx = _mm_cvtepi16_epi32(_mm_set1_epi64(template_point[m / 4].dx));
-                auto $iTy = _mm_cvtepi16_epi32(_mm_set1_epi64(template_point[m / 4].dy));
-                auto $iTm = template_point[m / 4].mag;
+                PartialSum += ((iSx * iTx) + (iSy * iTy)) * (iSm * iTm);
+                SumOfCoords  = m + 1;
+                PartialScore = PartialSum / SumOfCoords;
 
-                auto $offSet = _mm_andnot_si128($notok, _mm_add_epi32(_mm_mullo_epi32($curY, $350), $curX));
-                auto $iSxy = _mm_i32gather_epi32((int *)search_point.data(), $offSet, sizeof(searchFeat));
-                // isx isy isx isy isx isy isx isy
-                auto $iSx = _mm_srai_epi32(_mm_slli_epi32($iSxy, 16), 16);
-                auto $iSy = _mm_srai_epi32($iSxy, 16);
-                auto $iSm = _mm_i32gather_ps(1 + (float *)search_point.data(), $offSet, sizeof(searchFeat));
-
-                auto $accum = _mm_andnot_ps(_mm_castsi128_ps($notok),
-                                            _mm_mul_ps(
-                                            _mm_mul_ps($iSm, $iTm),
-                                            _mm_cvtepi32_ps(
-                                            _mm_add_epi32(
-                                            _mm_mullo_epi32($iSx, $iTx),
-                                            _mm_mullo_epi32($iSy, $iTy)))));
-                /* auto $cond = _mm_mul_ps($m1, */
-                /*                         _mm_min_ps( */
-                /*                         _mm_add_ps($anMinScore, _mm_mul_ps($NormGreediness, $m1)), */
-                /*                         _mm_mul_ps($NormMinScore, $m1))); */
-                /* for (int _ = 0; _ < 4; _++) */
-                /*      printf("%d %f %f %f %f %f %f %f %f %f %f %f\n", m + _, $accum[_], _mm_cvtepi32_ps($offSet)[_], _mm_cvtepi32_ps($curX)[_], _mm_cvtepi32_ps($curY)[_], _mm_cvtepi32_ps($iSx)[_], _mm_cvtepi32_ps($iSy)[_], _mm_cvtepi32_ps($iTx)[_], _mm_cvtepi32_ps($iTy)[_], $iSm[_], $iTm[_], _mm_cvtepi32_ps($notok)[_]); */
-                /* exit(1); */
-
-                // 0 1 2 3 (HI)
-                $accum = _mm_add_ps($accum, _mm_castsi128_ps(_mm_bslli_si128(_mm_castps_si128($accum), 4)));
-                // 0 1+0 2+1 3+2
-                $accum = _mm_add_ps($accum, _mm_castsi128_ps(_mm_bslli_si128(_mm_castps_si128($accum), 8)));
-                // 0 1+0 2+1+0 3+2+1+0
-
-                $PartialScore = _mm_add_ps($PartialSum, $accum);
-                /* auto $cond = _mm_mul_ps($SumOfCoords, _mm_min_ps( */
-                /*     _mm_add_ps(_mm_set1_ps(anMinScore), _mm_mul_ps(_mm_set1_ps(NormGreediness), $SumOfCoords)), */
-                /*     _mm_mul_ps(_mm_set1_ps(NormMinScore), $SumOfCoords))); */
-                auto $cond = _mm_load_ps(thresholds.data() + m);
-                auto $cmp = _mm_cmplt_ps($PartialScore, $cond);
-                int cmpmask = _mm_movemask_ps($cmp);
-                if (cmpmask) {
-                    int bit = __builtin_ctz(cmpmask);
-                    PartialScore = $PartialScore[bit] / (m + bit + 1);
-                    goto out;
+                if(PartialScore < thresholds[m]) {
+                    goto skip;
                 }
-                $PartialSum = _mm_add_ps($PartialSum, _mm_shuffle_ps($accum, $accum, 0xff));
             }
-            $PartialScore = _mm_div_ps($PartialScore, $SumOfCoords);
-            PartialScore = $PartialScore[(template_feat_size - 1) & 3];
-        out:
+            PartialScore = multiScore(template_point.data(), search_point.data(), thresholds.data(),
+                                      template_feat_size, search_feat_size, i, j, PartialSum);
+        skip:
             if(PartialScore > 0.4f)
             {
                 results0Deg[results0DegSize.fetch_add(1, std::memory_order_relaxed)] = {i, j, 0, PartialScore};
