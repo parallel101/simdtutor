@@ -2,7 +2,7 @@
 //***********************************normal_calSimilarity.cpp********************************
 //********************************************************************************************
 //#define USE_MULTISCORE//causing wrong result
-//#define USE_FIRSTUNROLL
+#define USE_FIRSTUNROLL
 #define USE_OPENMP
 #define USE_UNROLLM4
 #include <iostream>
@@ -199,7 +199,7 @@ std::vector<matchResult> const &calSimilarity(const std::vector<templateFeat> &t
     }
     
 #ifdef USE_OPENMP
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for schedule(dynamic, 8)
 #endif
     for(int i = 0; i < 1920; i++)
     {
@@ -406,6 +406,8 @@ int main()
 
     //运行算法,计算耗时
     auto start = std::chrono::high_resolution_clock::now();
+    /* for (int i = 0; i < 100; i++) */
+    /*     calSimilarity(template_point,search_point); */
     std::vector<matchResult> const &results0Deg = calSimilarity(template_point,search_point);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;

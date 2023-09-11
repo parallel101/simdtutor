@@ -94,7 +94,6 @@ void GetSubPixelValue(double* __restrict Rs, const double* __restrict preCaculat
 #pragma GCC unroll 5
         for (int j = 0; j < 5; j++)
         {
-            auto asdfafsd = _mm_add_epi32(yIndexI, xIndex[j]);
             auto factor = _mm256_i32gather_pd(preCaculatedParameter, _mm_add_epi32(yIndexI, xIndex[j]), 8); // 这个是8不是1
             rowResult = _mm256_fmadd_pd(factor, xWeight[j], rowResult);
         }
@@ -197,6 +196,7 @@ int main() {
     }
     std::vector<double> result(TEST_NUM);
 
+#if 0
     TICK(t);
     /* #pragma omp parallel for */
     for (size_t i = 0; i < TEST_NUM / WIDTH * WIDTH; i += WIDTH)
@@ -207,14 +207,18 @@ int main() {
     asm volatile ("" ::: "cc", "memory");
 #endif
     TOCK(t);
-
+#else
    // 以下的测试是单独测试的，不会一起测试，也就是一次只测试一个程序
-   // std::vector<double> resultOrigin(TEST_NUM);
-    //TICK(t_origin);
-    //for (size_t i = 0; i < TEST_NUM; i++)
-   // {
-   //     resultOrigin[i] = GetSubPixelValueOrigin(preCaculatedParameter.data(), width, height, xs[i], ys[i]);
-  //  }
-  //  TOCK(t_origin);
+    std::vector<double> resultOrigin(TEST_NUM);
+    TICK(t_origin);
+    for (size_t i = 0; i < TEST_NUM; i++)
+    {
+        resultOrigin[i] = GetSubPixelValueOrigin(preCaculatedParameter.data(), width, height, xs[i], ys[i]);
+    }
+#ifdef __GNUC__
+    asm volatile ("" ::: "cc", "memory");
+#endif
+    TOCK(t_origin);
+#endif
     return 0;
 }
