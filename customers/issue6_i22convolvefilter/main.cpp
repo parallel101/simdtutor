@@ -34,10 +34,32 @@ s16 tbl_filt_list[3][4][4] =
         }
 };
 
-static void i22(pel* src, s16* dst, int i_dst, int width, int height, const int td)
+/* #ifdef __GNUC__ */
+/* __attribute__((__always_inline__)) */
+/* #endif */
+static void convolve(int16_t const *__restrict in, int16_t *__restrict out, int16_t const *__restrict filter, size_t n, uint8_t shift, uint16_t offset) {
+    for (size_t i = 0; i < n; i++) {
+        uint16_t tmp = 0;
+        for (size_t j = 0; j < 4; j++) {
+            tmp += in[i + j] * filter[j];
+        }
+        out[i] = tmp >> shift;
+    }
+}
+
+/* #ifdef __GNUC__ */
+/* __attribute__((__always_inline__)) */
+/* #endif */
+void s16copy(int16_t *__restrict out, int16_t const *__restrict in, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        out[i] = in[i];
+    }
+}
+
+static void i22(pel*__restrict src, s16*__restrict dst, int i_dst, int width, int height, const int td)
 {
     const int is_small = width * height <= ((td - 1) ? 64 : 32);
-    s16* filter;
+    s16 *__restrict filter;
     s8 offset, shift_r;
 
     // i < td
@@ -46,24 +68,26 @@ static void i22(pel* src, s16* dst, int i_dst, int width, int height, const int 
     s16 col_0[64], col_1_td2[64];
 
     filter = tbl_filt_list[is_small + 1][1];
-    for (int j = 0; j < height; j++) {
-        col_0[j] = (s16)((
-            src[j - height - 1] * filter[0] +
-            src[j - height - 1 + 1] * filter[1] +
-            src[j - height - 1 + 2] * filter[2] +
-            src[j - height - 1 + 3] * filter[3] +
-            offset) >> shift_r);
-    }
+    convolve(src - height - 1, col_0, filter, height, shift_r, offset);
+    /* for (int j = 0; j < height; j++) { */
+    /*     col_0[j] = (s16)(( */
+    /*         src[j - height - 1] * filter[0] + */
+    /*         src[j - height - 1 + 1] * filter[1] + */
+    /*         src[j - height - 1 + 2] * filter[2] + */
+    /*         src[j - height - 1 + 3] * filter[3] + */
+    /*         offset) >> shift_r); */
+    /* } */
     if (2 == td) {
         filter = tbl_filt_list[is_small + 1][2];
-        for (int j = 0; j < height; j++) {
-            col_1_td2[j] = (s16)((
-                src[j - height - 1] * filter[0] +
-                src[j - height - 1 + 1] * filter[1] +
-                src[j - height - 1 + 2] * filter[2] +
-                src[j - height - 1 + 3] * filter[3] +
-                offset) >> shift_r);
-        }
+        convolve(src - height - 1, col_1_td2, filter, height, shift_r, offset);
+        /* for (int j = 0; j < height; j++) { */
+        /*     col_1_td2[j] = (s16)(( */
+        /*         src[j - height - 1] * filter[0] + */
+        /*         src[j - height - 1 + 1] * filter[1] + */
+        /*         src[j - height - 1 + 2] * filter[2] + */
+        /*         src[j - height - 1 + 3] * filter[3] + */
+        /*         offset) >> shift_r); */
+        /* } */
     }
 
     // i >= td
@@ -186,21 +210,24 @@ static void i22(pel* src, s16* dst, int i_dst, int width, int height, const int 
     if (width > 4) {
         for (int j = 0; j < height; j++) {
             dst[0] = col_0[height - 1 - j];
-            if (2 == td) {
+        }
+        if (2 == td) {
+            for (int j = 0; j < height; j++) {
                 dst[1] = col_1_td2[height - 1 - j];
             }
-
-            if ((3 + 4 * j) < width) {
-                memcpy(dst + td, ref_left + (4 * (height - 1) + rem_rl - 1) - (4 * j + rem_rl - 1), (rem_rl + 4 * j) * sizeof(s16));
-                memcpy(dst + 3 + 4 * j, ref_above, (width - (3 + 4 * j)) * sizeof(s16));
-            }
-            else {
-                // w - 3
-                memcpy(dst + td, ref_left + (4 * (height - 1) + rem_rl - 1) - (4 * j + rem_rl - 1), (width - td) * sizeof(s16));
-            }
-
-            dst += i_dst;
         }
+
+        auto mid = std::min((width - 3) / 4, height);
+        auto rlp = ref_left + (4 * (height - 1) + rem_rl - 1) - (rem_rl - 1);
+        s16copy(dst + td, rlp - 4 * mid, rem_rl + 4 * mid);
+        for (int j = 0; j < mid; j++) {
+            s16copy(dst + 3 + 4 * j, ref_above, width - 3 - 4 * j);
+        }
+        for (int j = mid; j < height; j++) {
+            s16copy(dst + td, rlp - 4 * j, width - td);
+        }
+
+        dst += i_dst;
     }
     else {
         for (int j = 0; j < height; j++) {
