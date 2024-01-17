@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <functional>
 #include <memory>
 #include <string>
 #include "cppdemangle.h"
@@ -61,6 +62,34 @@ struct Test {
 // 主类型 std::shared_ptr<T>
 // 弱引用类型 std::weak_ptr<T>、T *
 
+std::vector<std::function<void()>> g_funcs;
+
+void func(auto f) {
+    g_funcs.emplace_back(std::move(f));
+}
+
+void bao() {
+    for (auto f: g_funcs) {
+        f();
+    }
+}
+
+void foo() {
+    std::shared_ptr<int> i(new int(1));
+    func([=] {
+        printf("1i = %d\n", (*i)++);
+    });
+    func([=] {
+        printf("2i = %d\n", (*i)++);
+    });
+}
+
+int main() {
+    foo();
+    bao();
+}
+
+#if 0
 std::string split(std::string s, char c) {
     auto pos = s.find(c);
     if (pos == std::string::npos) {
@@ -105,3 +134,4 @@ int main() {
     /* puts("---"); */
     return 0;
 }
+#endif
