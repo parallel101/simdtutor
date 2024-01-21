@@ -2,10 +2,10 @@
 #include <vector>
 #include <iostream>
 #include <tuple>
+#include <algorithm>
 
 template <class V>
-struct variant_to_tuple_of_vector {
-};
+struct variant_to_tuple_of_vector;
 
 template <class ...Ts>
 struct variant_to_tuple_of_vector<variant<Ts...>> {
@@ -46,9 +46,12 @@ auto static_for_break_if_true(Lambda &&lambda) {
 #endif
 
 void add_object(Object o) {
-    static_for_break_if_false<std::variant_size_v<Object>>([&] (auto ic) {
+    /* [&] <size_t ...Is> (index_sequence<Is...>) { */
+    /*     return ((o.index() == Is && (get<Is>(objects).push_back(get<Is>(o)), false)) && ...); */
+    /* }(make_index_sequence<variant_size_v<Object>>{}); */
+    static_for_break_if_false<variant_size_v<Object>>([&] (auto ic) {
         if (o.index() == ic) {
-            get<ic.value>(objects).push_back(get<ic>(o));
+            get<ic>(objects).push_back(get<ic>(o));
             return false;
         }
         return true;
@@ -56,7 +59,12 @@ void add_object(Object o) {
 }
 
 void print_objects() {
-    static_for<std::variant_size_v<Object>>([&] (auto ic) {
+    /* [&] <size_t ...Is> (index_sequence<Is...>) { */
+    /*     return (ranges::for_each(get<Is>(objects), [&] (auto o) { */
+    /*         return (cout << o << endl, void()); */
+    /*     }), ...); */
+    /* }(make_index_sequence<variant_size_v<Object>>{}); */
+    static_for<variant_size_v<Object>>([&] (auto ic) {
         for (auto const &o: get<ic>(objects)) {
             cout << o << endl;
         }
