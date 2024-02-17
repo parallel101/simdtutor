@@ -12,6 +12,8 @@ template<class Ty,size_t size>
 struct array {
     Ty* begin() { return arr; };
     Ty* end() { return arr + size; };
+    Ty const* begin() const { return arr; };
+    Ty const* end() const { return arr + size; };
     Ty arr[size];
 };
 
