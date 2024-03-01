@@ -98,6 +98,12 @@ std::basic_string_view<To> reinterpret_string(std::basic_string_view<From> in) {
     return std::basic_string_view<To>{reinterpret_cast<const To *>(in.data()), in.size()};
 }
 
+template <class To, class From>
+const To *reinterpret_string(const From *in) {
+    static_assert(sizeof(To) == sizeof(From));
+    return reinterpret_cast<const To *>(in);
+}
+
 inline std::wstring utf8_to_wide(std::u8string_view in) {
     if constexpr (sizeof(wchar_t) == 1) {
         return std::wstring{reinterpret_string<wchar_t>(in)};
@@ -150,6 +156,12 @@ inline std::u16string utf8_to_utf16(std::u8string_view in) {
     return widen<char16_t, char8_t>(in, std::locale::classic());
 }
 
+#define ansi_literial(s) s
+#define unicode_literial(s) L##s
+#define utf8_literial(s) u8##s
+#define utf16_literial(s) u##s
+#define utf32_literial(s) U##s
+
 int main() {
     using namespace std;
     auto s_ansi = "我🤔"s;
@@ -164,9 +176,11 @@ int main() {
     cout << "utf32:   " << as_hex(s_utf32) << endl;
     auto s_gb18030 = narrowing<wchar_t, char>(widen<wchar_t, char>("我🤔"s, std::locale("")), std::locale("zh_CN.GB18030"));
     cout << "gb18030: " << as_hex(s_gb18030) << endl;
-    auto s_test = widen<wchar_t, char>("\xE6\x88\x91\xF0\x9F\xA4\x94"s, std::locale(""));
+    auto s_test = ansi_to_wide("我🤔"s, std::locale(""));
     cout << "test:    " << as_hex(s_test) << endl;
-    auto s_test2 = ansi_to_utf8("\xCE\xD2\x95\x30\xCD\x34"s, std::locale("zh_CN.GB18030"));
+    auto s_test2 = wide_to_ansi(L"我🤔"s, std::locale("zh_CN.GBK"));
     cout << "test2:   " << as_hex(s_test2) << endl;
+    auto s_test3 = wide_to_ansi(L"我🤔"s, std::locale("zh_CN.GB18030"));
+    cout << "test3:   " << as_hex(s_test3) << endl;
     return 0;
 }
