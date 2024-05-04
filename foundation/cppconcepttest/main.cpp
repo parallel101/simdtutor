@@ -1,67 +1,26 @@
 #include <concepts>
 #include <cstdio>
+#include <string>
 
-struct Dog {
-    void speak() {
-        puts("汪汪");
-    }
-};
-
-struct Cat {
-    void speak() {
-        puts("喵喵");
-    }
-};
-
-struct Human {
-    void speak() {
-        puts("我是人类");
-    }
-
-    void learn() {
-        puts("正在播放小彭老师课程");
-    }
-};
-
-struct Robot {
-    void speak() {
-        puts("我是机器人");
-    }
-
-    void learn() {
-        puts("我是一只智能机器人，我具有机器学习功能");
-    }
-};
-
-void educate(Human animal) {
-    animal.speak();
-    animal.learn();
+void print(int a) {
+    printf("int: %d\n", a);
 }
 
-void educate(Robot animal) {
-    animal.speak();
-    animal.learn();
+void print(double a) {
+    printf("double: %lf\n", a);
 }
 
-void educate(Dog animal) {
-    animal.speak();
-    puts("该动物不支持学习");
+void print(const char *a) {
+    printf("const char *: %s\n", a);
 }
 
-void educate(Cat animal) {
-    animal.speak();
-    puts("该动物不支持学习");
+void print(std::string a) {
+    printf("string: %s\n", a.c_str());
 }
 
 int main() {
-    Human student;
-    Dog petDog;
-    Robot smartRobot;
-    puts("人类：");
-    educate(student);
-    puts("狗狗：");
-    educate(petDog);
-    puts("机器人：");
-    educate(smartRobot);
+    print(42);
+    print("你好");
+    print(std::string("你好"));
     return 0;
 }
