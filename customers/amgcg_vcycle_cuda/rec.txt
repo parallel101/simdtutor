@@ -1,16 +1,28 @@
--N 128
+-N 256
 
-// numpy:
+// numpy all:
 
-3-0 r:3.80e+02 5.70e-13 primary:2.58e-06 dual_r:5.60e-07 object:3.24e-05 iter:41 t:0.77s calcr:0.01s
-Total V_cycle time in one amg_cg_solve: 0.4957s
-Total time of amg_cg_solve: 0.5926s
-Time of CG(exclude v-cycle): 0.0968s
-amg_cg_solve time 0.5926263939982164
-3-1 r:7.61e-07 4.67e-13 primary:3.25e-06 dual_r:4.71e-07 object:2.93e-05 iter:37 t:0.69s calcr:0.01s
+3-0 r:3.82e+02 5.69e-13 primary:2.58e-06 dual_r:5.60e-07 object:3.24e-
+05 iter:41 t:0.74s calcr:0.01s
+setup AMG time:0.021065158000055817
+Total V_cycle time in one amg_cg_solve: 0.5006s
+Total time of amg_cg_solve: 0.5990s
+Time of CG(exclude v-cycle): 0.0984s
+amg_cg_solve time 0.5990871059984784
+3-1 r:7.61e-07 4.67e-13 primary:3.25e-06 dual_r:4.71e-07 object:2.93e-
+05 iter:37 t:0.69s calcr:0.01s
 Saved frame-3 states to 'result/latest///state/0003.npz', 6 variables
-Time of exporting: 0.02s, where mesh:0.00s state:0.00s matrix:0.00s calc_r:0.01s export_r:0.00s
-Time of frame-3: 1.49s
+Time of exporting: 0.02s, where mesh:0.00s state:0.00s matrix:0.00s ca
+lc_r:0.01s export_r:0.00s
+Time of frame-3: 1.46s
+
+ 13%|████▌                             | 4/30 [00:04<00:33,  1.30s/it]
+setup AMG time:0.017685753000478144
+Total V_cycle time in one amg_cg_solve: 0.5433s
+Total time of amg_cg_solve: 0.6504s
+Time of CG(exclude v-cycle): 0.1070s
+amg_cg_solve time 0.6504499479997321
+4-0 r:3.79e+02 1.39e-12 primary:6.15e-06 dual_r:1.12e-06 object:1.96e-
 
  13%|███████████                                                                        | 4/30 [00:05<00:37,  1.44s/it]
 Total V_cycle time in one amg_cg_solve: 0.5691s
@@ -19,7 +31,7 @@ Time of CG(exclude v-cycle): 0.1122s
 amg_cg_solve time 0.6813539690010657
 4-0 r:3.82e+02 1.40e-12 primary:6.15e-06 dual_r:1.12e-06 object:1.96e-04 iter:41 t:0.78s calcr:0.01s
 
-// cuda:
+// cuda vcycle + numpy cg:
 
 3-0 r:3.80e+02 5.69e-13 primary:2.58e-06 dual_r:5.60e-07 object:3.24e-
 05 iter:41 t:0.28s calcr:0.01s
@@ -44,3 +56,29 @@ Total time of amg_cg_solve: 0.1935s
 Time of CG(exclude v-cycle): 0.1038s
 amg_cg_solve time 0.19356907299970771
 4-0 r:3.79e+02 1.39e-12 primary:6.15e-06 dual_r:1.12e-06 object:1.96e-
+
+// cuda all:
+
+3-0 r:3.80e+02 1.51e-11 primary:2.58e-06 dual_r:5.60e-07 object:3.24e-
+05 iter:41 t:0.16s calcr:0.01s
+setup AMG time:0.01736747299946728
+Setup detected! reuploading A, R, P matrices
+Total V_cycle time in one amg_cg_solve: 0.0364s
+Total time of amg_cg_solve: 0.0560s
+Time of CG(exclude v-cycle): 0.0197s
+amg_cg_solve time 0.06032915700052399
+3-1 r:7.61e-07 1.86e-12 primary:3.25e-06 dual_r:4.71e-07 object:2.93e-
+05 iter:37 t:0.15s calcr:0.01s
+Saved frame-3 states to 'result/latest///state/0003.npz', 6 variables
+Time of exporting: 0.02s, where mesh:0.00s state:0.00s matrix:0.00s ca
+lc_r:0.01s export_r:0.00s
+Time of frame-3: 0.34s
+
+ 13%|████▌                             | 4/30 [00:01<00:11,  2.29it/s]
+setup AMG time:0.016985225998723763
+Setup detected! reuploading A, R, P matrices
+Total V_cycle time in one amg_cg_solve: 0.0396s
+Total time of amg_cg_solve: 0.0612s
+Time of CG(exclude v-cycle): 0.0216s
+amg_cg_solve time 0.06554422000044724
+4-0 r:3.80e+02 4.71e-11 primary:6.15e-06 dual_r:1.12e-06 object:1.96e-

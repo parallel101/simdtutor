@@ -204,7 +204,6 @@ struct Vec {
         m_data = that.m_data;
         m_size = that.m_size;
         m_cap = that.m_cap;
-        that.handle = nullptr;
         that.m_data = nullptr;
         that.m_size = 0;
         that.m_cap = 0;
@@ -471,14 +470,31 @@ struct Kernels {
     }
 
     // dst = alpha * x
-    void scal(Vec<float> &dst, float const &alpha, Vec<float> const &x) {
+    void scal2(Vec<float> &dst, float const &alpha, Vec<float> const &x) {
         copy(dst, x);
+        CHECK_CUBLAS(cublasSscal_v2(cublas, dst.size(), &alpha, dst.data(), 1));
+    }
+
+    // dst = alpha * alpha
+    void scal(Vec<float> &dst, float const &alpha) {
         CHECK_CUBLAS(cublasSscal_v2(cublas, dst.size(), &alpha, dst.data(), 1));
     }
 
     // x = A^{-1} b
     void spsolve(Vec<float> &x, CSR<float> const &A, Vec<float> const &b) {
         throw;
+    }
+
+    float vdot(Vec<float> const &x, Vec<float> const &y) {
+        float result;
+        CHECK_CUBLAS(cublasSdot_v2(cublas, x.size(), x.data(), 1, y.data(), 1, &result));
+        return result;
+    }
+
+    float vnorm(Vec<float> const &x) {
+        float result;
+        CHECK_CUBLAS(cublasSnrm2_v2(cublas, x.size(), x.data(), 1, &result));
+        return result;
     }
 };
 
@@ -499,11 +515,13 @@ struct VCycle : Kernels {
     std::vector<float> coefficients;
     Vec<float> init_x;
     Vec<float> init_b;
-    Buffer buf1;
-    Buffer buf2;
-    Buffer buf3;
-    Buffer buf4;
-    Buffer buf5;
+    Vec<float> outer_x;
+    Vec<float> alter_x;
+    Vec<float> outer_b;
+    float save_rho_prev;
+    Vec<float> save_p;
+    Vec<float> save_q;
+    Buffer buff;
 
     void setup(size_t numlvs) {
         if (levels.size() < numlvs) {
@@ -529,14 +547,14 @@ struct VCycle : Kernels {
 
     void _smooth(int lv, Vec<float> &x, Vec<float> const &b) {
         copy(levels.at(lv).residual, b);
-        spmv(levels.at(lv).residual, -1, levels.at(lv).A, x, 1, buf4); // residual = b - A@x
-        scal(levels.at(lv).h, coefficients.at(0), levels.at(lv).residual); // h = c0 * residual
+        spmv(levels.at(lv).residual, -1, levels.at(lv).A, x, 1, buff); // residual = b - A@x
+        scal2(levels.at(lv).h, coefficients.at(0), levels.at(lv).residual); // h = c0 * residual
 
 
         for (int i = 1; i < coefficients.size(); ++i) {
             // h' = ci * residual + A@h
             copy(levels.at(lv).outh, levels.at(lv).residual);
-            spmv(levels.at(lv).outh, 1, levels.at(lv).A, levels.at(lv).h, coefficients.at(i), buf5);
+            spmv(levels.at(lv).outh, 1, levels.at(lv).A, levels.at(lv).h, coefficients.at(i), buff);
 
             // copy(levels.at(lv).h, levels.at(lv).outh);
             levels.at(lv).h.swap(levels.at(lv).outh);
@@ -545,10 +563,13 @@ struct VCycle : Kernels {
         axpy(x, 1, levels.at(lv).h); // x += h
     }
 
-    void set_x_b(float const *x, float const *b, size_t n) {
+    void set_init_x(float const *x, size_t n) {
         init_x.resize(n);
-        init_b.resize(n);
         CHECK_CUDA(cudaMemcpy(init_x.data(), x, n * sizeof(float), cudaMemcpyHostToDevice));
+    }
+
+    void set_init_b(float const *b, size_t n) {
+        init_b.resize(n);
         CHECK_CUDA(cudaMemcpy(init_b.data(), b, n * sizeof(float), cudaMemcpyHostToDevice));
     }
 
@@ -559,10 +580,10 @@ struct VCycle : Kernels {
             _smooth(lv, x, b);
 
             copy(levels.at(lv).residual, b);
-            spmv(levels.at(lv).residual, -1, levels.at(lv).A, x, 1, buf1); // residual = b - A@x
+            spmv(levels.at(lv).residual, -1, levels.at(lv).A, x, 1, buff); // residual = b - A@x
 
             levels.at(lv).b.resize(levels.at(lv).R.nrows);
-            spmv(levels.at(lv).b, 1, levels.at(lv).R, levels.at(lv).residual, 0, buf2); // coarse_b = R@residual
+            spmv(levels.at(lv).b, 1, levels.at(lv).R, levels.at(lv).residual, 0, buff); // coarse_b = R@residual
 
             levels.at(lv).x.resize(levels.at(lv).b.size());
             zero(levels.at(lv).x);
@@ -573,7 +594,7 @@ struct VCycle : Kernels {
         for (int lv = nlvs-2; lv >= 0; --lv) {
             Vec<float> &x = lv != 0 ? levels.at(lv - 1).x : init_x;
             Vec<float> &b = lv != 0 ? levels.at(lv - 1).b : init_b;
-            spmv(x, 1, levels.at(lv).P, levels.at(lv).x, 1, buf3); // x += P@coarse_x
+            spmv(x, 1, levels.at(lv).P, levels.at(lv).x, 1, buff); // x += P@coarse_x
             _smooth(lv, x, b);
         }
     }
@@ -605,6 +626,60 @@ struct VCycle : Kernels {
         auto const &b = levels.at(nlvs - 2).b;
         spsolve(x, A, b);
     }
+
+    void copy_outer2init_x() {
+        copy(init_x, outer_x);
+    }
+
+    void set_outer_x(float const *x, size_t n) {
+        outer_x.resize(n);
+        CHECK_CUDA(cudaMemcpy(outer_x.data(), x, n * sizeof(float), cudaMemcpyHostToDevice));
+        copy(alter_x, outer_x);
+    }
+
+    void set_outer_b(float const *b, size_t n) {
+        outer_b.resize(n);
+        CHECK_CUDA(cudaMemcpy(outer_b.data(), b, n * sizeof(float), cudaMemcpyHostToDevice));
+    }
+
+    float init_cg_iter0(float *residuals) {
+        float bnrm2 = vnorm(outer_b);
+        // r = b - A@(x)
+        copy(init_b, outer_b);
+        spmv(outer_b, -1, levels.at(0).A, outer_x, 1, buff);
+        float normr = vnorm(init_b);
+        residuals[0] = normr;
+        return bnrm2;
+    }
+
+    void do_cg_itern(float *residuals, size_t iteration) {
+        float rho_cur = vdot(init_b, init_x);
+        if (iteration > 0) {
+            float beta = rho_cur / save_rho_prev;
+            // p *= beta
+            // p += z
+            scal(save_p, beta);
+            axpy(save_p, 1, init_x);
+        } else {
+            // p = move(z)
+            save_p.swap(init_x);
+        }
+        // q = A@(p)
+        save_q.resize(levels.at(0).A.nrows);
+        spmv(save_q, 1, levels.at(0).A, save_p, 0, buff);
+        save_rho_prev = rho_cur;
+        float alpha = rho_cur / vdot(save_p, save_q);
+        // x += alpha*p
+        axpy(alter_x, alpha, save_p);
+        // r -= alpha*q
+        axpy(init_b, -alpha, save_q);
+        float normr = vnorm(init_b);
+        residuals[iteration + 1] = normr;
+    }
+
+    void fetch_cg_final_x(float *x) {
+        CHECK_CUDA(cudaMemcpy(x, alter_x.data(), alter_x.size() * sizeof(float), cudaMemcpyDeviceToHost));
+    }
 };
 
 }
@@ -631,8 +706,12 @@ extern "C" DLLEXPORT void fastmg_set_lv_csrmat(size_t lv, size_t which, float co
     fastmg->set_lv_csrmat(lv, which, datap, ndat, indicesp, nind, indptrp, nptr, rows, cols, nnz);
 }
 
-extern "C" DLLEXPORT void fastmg_set_x_b(float const *x, float const *b, size_t n) {
-    fastmg->set_x_b(x, b, n);
+extern "C" DLLEXPORT void fastmg_set_init_x(float const *x, size_t n) {
+    fastmg->set_init_x(x, n);
+}
+
+extern "C" DLLEXPORT void fastmg_set_init_b(float const *b, size_t n) {
+    fastmg->set_init_b(b, n);
 }
 
 extern "C" DLLEXPORT void fastmg_vcycle_down() {
@@ -663,30 +742,26 @@ extern "C" DLLEXPORT void fastmg_coarse_solve() {
     fastmg->coarse_solve();
 }
 
+extern "C" DLLEXPORT void fastmg_set_outer_x(float const *x, size_t n) {
+    fastmg->set_outer_x(x, n);
+}
 
-//extern "C" DLLEXPORT void fastmg_test() {
-    //if (!fastmg)
-        //fastmg = new VCycle{};
-    //fastmg->setup(3);
-//
-    //CSR<float> &mat = fastmg->levels.at(0).A;
-    //auto dat = _load<float>("/tmp/vcycle-new-1.txt");
-    //auto ind = _load<int>("/tmp/vcycle-new-2.txt");
-    //auto off = _load<int>("/tmp/vcycle-new-3.txt");
-    //mat.assign(dat.data(), std::size(dat), ind.data(),
-               //std::size(ind), off.data(), std::size(off),
-               //off.size() - 1, *std::max_element(ind.begin(), ind.end()) + 1, std::size(dat));
-    //Vec<float> &out = fastmg->levels.at(0).outh;
-    //Vec<float> &x = fastmg->levels.at(0).h;
-    //out.resize(mat.nrows);
-    //auto xd = _load<float>("/tmp/vcycle-new-4.txt");
-    //x.assign(xd.data(), std::size(xd));
-    //Buffer &buf = fastmg->buf5;
-    //fastmg->spmv(out, 1, mat, x, 0, buf);
-    //xd.resize(out.size());
-    //out.store(xd.data());
-    //for (int i = 0; i < xd.size(); ++i) {
-        //if (xd[i] != 0)
-            //printf("!XD %d %e\n", i, xd[i]);
-    //}
-//}
+extern "C" DLLEXPORT void fastmg_copy_outer2init_x() {
+    fastmg->copy_outer2init_x();
+}
+
+extern "C" DLLEXPORT void fastmg_set_outer_b(float const *b, size_t n) {
+    fastmg->set_outer_b(b, n);
+}
+
+extern "C" DLLEXPORT float fastmg_init_cg_iter0(float *residuals) {
+    return fastmg->init_cg_iter0(residuals);
+}
+
+extern "C" DLLEXPORT void fastmg_do_cg_itern(float *residuals, size_t iteration) {
+    return fastmg->do_cg_itern(residuals, iteration);
+}
+
+extern "C" DLLEXPORT void fastmg_fetch_cg_final_x(float *x) {
+    fastmg->fetch_cg_final_x(x);
+}

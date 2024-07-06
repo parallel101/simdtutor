@@ -1017,7 +1017,7 @@ def setup_AMG(A,ite):
     return levels
 
 
-def amg_cg_solve(levels, b, x0=None, tol=1e-5, maxiter=100):
+def old_amg_cg_solve(levels, b, x0=None, tol=1e-5, maxiter=100):
     assert x0 is not None
     tic_amgcg = perf_counter()
     x = x0.copy()
@@ -1026,12 +1026,7 @@ def amg_cg_solve(levels, b, x0=None, tol=1e-5, maxiter=100):
     t_vcycle = 0.0
     def psolve(b):
         x = x0.copy()
-        if vcycle_type == 'old':
-            old_V_cycle(levels, 0, x, b)
-        elif vcycle_type == 'new':
-            new_V_cycle(levels, 0, x, b)
-        else:
-            assert False
+        old_V_cycle(levels, 0, x, b)
         return x
     bnrm2 = np.linalg.norm(b)
     atol = tol * bnrm2
@@ -1063,6 +1058,43 @@ def amg_cg_solve(levels, b, x0=None, tol=1e-5, maxiter=100):
         rho_prev = rho_cur
         normr = np.linalg.norm(r)
         residuals[iteration+1] = normr
+    residuals = residuals[:iteration+1]
+    toc_amgcg = perf_counter()
+    t_amgcg = toc_amgcg - tic_amgcg
+    print(f"Total V_cycle time in one amg_cg_solve: {t_vcycle:.4f}s")
+    print(f"Total time of amg_cg_solve: {t_amgcg:.4f}s")
+    print(f"Time of CG(exclude v-cycle): {t_amgcg - t_vcycle:.4f}s")
+    return (x),  residuals  
+
+def new_amg_cg_solve(levels, b, x0=None, tol=1e-5, maxiter=100):
+    init_g_vcycle(levels)
+    assert g_vcycle
+
+    assert x0 is not None
+    tic_amgcg = perf_counter()
+    x0_contig = np.ascontiguousarray(x0, dtype=np.float32)
+    g_vcycle.fastmg_set_outer_x(x0_contig.ctypes.data, x0_contig.shape[0])
+    t_vcycle = 0.0
+    b_contig = np.ascontiguousarray(b, dtype=np.float32)
+    g_vcycle.fastmg_set_outer_b(b_contig.ctypes.data, b.shape[0])
+    residuals_empty = np.empty(shape=(maxiter+1,), dtype=np.float32)
+    residuals = np.ascontiguousarray(residuals_empty, dtype=np.float32)
+    bnrm2 = g_vcycle.fastmg_init_cg_iter0(residuals.ctypes.data) # init_b = r = b - A@x; residuals[0] = normr
+    atol = bnrm2 * tol
+    iteration = 0
+    for iteration in range(maxiter):
+        if residuals[iteration] < atol:
+            break
+        tic_vcycle = perf_counter()
+        g_vcycle.fastmg_copy_outer2init_x()
+        new_V_cycle(levels)
+        toc_vcycle = perf_counter()
+        t_vcycle += toc_vcycle - tic_vcycle
+        # print(f"Once V_cycle time: {toc_vcycle - tic_vcycle:.4f}s")
+        g_vcycle.fastmg_do_cg_itern(residuals.ctypes.data, iteration)
+    x_empty = np.empty_like(x0, dtype=np.float32)
+    x = np.ascontiguousarray(x_empty, dtype=np.float32)
+    g_vcycle.fastmg_fetch_cg_final_x(x.ctypes.data)
     residuals = residuals[:iteration+1]
     toc_amgcg = perf_counter()
     t_amgcg = toc_amgcg - tic_amgcg
@@ -1152,16 +1184,25 @@ def old_V_cycle(levels,lvl,x,b):
 bcnt = 0
 g_vcycle = None
 g_vcycle_cached_levels = None
-def new_V_cycle(levels, _, x, b):
-    vcycle_has_course_solve = False
+vcycle_has_course_solve = False
+
+def init_g_vcycle(levels):
     global g_vcycle
     global g_vcycle_cached_levels
 
     if g_vcycle is None:
         g_vcycle = ctypes.cdll.LoadLibrary('./build/libfast-vcycle-gpu.so')
+        g_vcycle.fastmg_copy_outer2init_x.argtypes = []
+        g_vcycle.fastmg_set_outer_x.argtypes = [ctypes.c_size_t] * 2
+        g_vcycle.fastmg_set_outer_b.argtypes = [ctypes.c_size_t] * 2
+        g_vcycle.fastmg_init_cg_iter0.argtypes = [ctypes.c_size_t]
+        g_vcycle.fastmg_init_cg_iter0.restype = ctypes.c_float
+        g_vcycle.fastmg_do_cg_itern.argtypes = [ctypes.c_size_t, ctypes.c_size_t]
+        g_vcycle.fastmg_fetch_cg_final_x.argtypes = [ctypes.c_size_t]
         g_vcycle.fastmg_setup.argtypes = [ctypes.c_size_t]
-        g_vcycle.fastmg_set_coeff.argtypes = [ctypes.c_size_t, ctypes.c_size_t]
-        g_vcycle.fastmg_set_x_b.argtypes = [ctypes.c_size_t] * 3
+        g_vcycle.fastmg_set_coeff.argtypes = [ctypes.c_size_t] * 2
+        g_vcycle.fastmg_set_init_x.argtypes = [ctypes.c_size_t] * 2
+        g_vcycle.fastmg_set_init_b.argtypes = [ctypes.c_size_t] * 2
         g_vcycle.fastmg_get_coarsist_size.argtypes = []
         g_vcycle.fastmg_get_coarsist_size.restype = ctypes.c_size_t
         g_vcycle.fastmg_get_coarsist_b.argtypes = [ctypes.c_size_t]
@@ -1196,9 +1237,8 @@ def new_V_cycle(levels, _, x, b):
                                                   indptr_contig.ctypes.data, indptr_contig.shape[0],
                                                   mat.shape[0], mat.shape[1], mat.nnz)
 
-    x_contig = np.ascontiguousarray(x, dtype=np.float32)
-    b_contig = np.ascontiguousarray(b, dtype=np.float32)
-    g_vcycle.fastmg_set_x_b(x_contig.ctypes.data, b_contig.ctypes.data, x_contig.shape[0])
+def new_V_cycle(levels):
+    assert g_vcycle
     g_vcycle.fastmg_vcycle_down()
     if vcycle_has_course_solve:
         g_vcycle.fastmg_coarse_solve()
@@ -1214,13 +1254,14 @@ def new_V_cycle(levels, _, x, b):
         coarsist_x_contig = np.ascontiguousarray(coarsist_x, dtype=np.float32)
         g_vcycle.fastmg_set_coarsist_x(coarsist_x_contig.ctypes.data)
     g_vcycle.fastmg_vcycle_up()
-    if x.ctypes.strides[0] == 8 and x.dtype == np.float32:
-        g_vcycle.fastmg_get_finest_x(x.ctypes.data)
-    else:
-        finest_x_empty = np.empty_like(x)
-        finest_x = np.ascontiguousarray(finest_x_empty, dtype=np.float32)
-        g_vcycle.fastmg_get_finest_x(finest_x.ctypes.data)
-        x[:] = finest_x
+    # if x.ctypes.strides[0] == 8 and x.dtype == np.float32:
+    #     g_vcycle.fastmg_get_finest_x(x.ctypes.data)
+    # else:
+    # finest_x_empty = np.empty_like(x)
+    # finest_x = np.ascontiguousarray(finest_x_empty, dtype=np.float32)
+    # g_vcycle.fastmg_get_finest_x(finest_x.ctypes.data)
+    # return finest_x
+    # x[:] = finest_x
 
 
 
@@ -1572,6 +1613,12 @@ def substep_all_solver(max_iter=1):
             tic2 = time.perf_counter()
             global update_coarse_solver
             update_coarse_solver = True
+            if vcycle_type == 'old':
+                amg_cg_solve = old_amg_cg_solve
+            elif vcycle_type == 'new':
+                amg_cg_solve = new_amg_cg_solve
+            else:
+                assert False
             x,residuals = amg_cg_solve(levels, b, x0=x0, maxiter=max_iter_Axb, tol=1e-6)
             toc2 = time.perf_counter()
             logging.info(f"amg_cg_solve time {toc2-tic2}")
