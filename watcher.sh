@@ -1,12 +1,12 @@
 #!/bin/bash
 # Requirements: pacman -S inotify-tools gtest benchmark gcc python sed gdb
 
-file="main.cpp"
+file="${1-main.cpp}"
 out="/tmp/watched.s"
 bench="/tmp/benched.cpp"
 result="/tmp/result.json"
 record="/tmp/record.json"
-cflags="-masm=intel -mavx2 -mfma -O3 -fopenmp"
+cflags="-masm=intel -mavx2 -mfma -O3 -DNDEBUG -fopenmp -Wall -lgslcblas"
 cc="g++"
 
 lastmd5=
@@ -24,6 +24,7 @@ do
         cat "$file" | sed '/\#include <benchmark\/benchmark.h>/d; /^static void \w\+(benchmark::State/,/^BENCHMARK(\w\+)/d' | sed '/\#include <gtest\/gtest.h>/d; /^TEST(\w\+, \w\+) {$/,/^}$/d' | "$cc" -S -x c++ /dev/stdin $cflags -o /dev/stdout 2> /tmp/.W$$.gcc-error.log | sed 's/^\t\.\(align\|byte\|short\|long\|float\|quad\|rept\|string\|ascii\|asciz\)\t/  \.\1  /g' | sed '/^\t\..*[^:]$/d' | sed 's/\t/  /g' | sed '$a ; '"$(date +'Compiled at %Y\/%m\/%d %H:%M:%S')" | tee "$out"
         if [ -s /tmp/.W$$.gcc-error.log ]
         then
+            echo '-- Error in compile'
             cat /tmp/.W$$.gcc-error.log >> "$out"
         else
             echo '-- Testing...'
