@@ -39,9 +39,11 @@ int main() {
 
         // padZeroData和b两个向量卷积，结果放入vec中；
         for (int idy = 0; idy < size2; idy++) {
+            float tmp = 0;
             for (int idz = 0; idz < sizeb; idz++) {
-                result[idx * size2 + idy] += padZeroData[idy + idz] * b[idz];
+                tmp += padZeroData[idy + idz] * b[idz];
             }
+            result[idx * size2 + idy] = tmp;
         }
     }
     auto t1 = std::chrono::steady_clock::now();
