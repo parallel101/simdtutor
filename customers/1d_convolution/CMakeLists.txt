@@ -11,4 +11,4 @@ add_executable(main main.cpp)
 
 find_package(OpenMP REQUIRED)
 target_link_libraries(main OpenMP::OpenMP_CXX)
-target_compile_options(main PUBLIC $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-mavx2$<SEMICOLON>-mfma> $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/arch:AVX2>)
+target_compile_options(main PUBLIC $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-mavx512f$<SEMICOLON>-mavx512dq$<SEMICOLON>-mfma> $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/arch:AVX512>)
