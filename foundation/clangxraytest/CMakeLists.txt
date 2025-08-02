@@ -14,5 +14,5 @@ target_compile_options(main PRIVATE
     -fxray-instrument -fxray-instruction-threshold=1
 )
 target_link_options(main PRIVATE
-    -fxray-instrument -fxray-instruction-threshold=1
+    -fxray-instrument
 )
