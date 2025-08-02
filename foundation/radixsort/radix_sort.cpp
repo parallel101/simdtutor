@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 #include <omp.h>
+#include <tbb/parallel_sort.h>
 #include "show_time.h"
 
 
@@ -407,51 +408,60 @@ int main()
     std::vector<uint32_t> ini(100000000); // 一千万
     randomize_data(ini.data(), ini.size());
 
-    // {
-    //     std::vector<uint32_t> a = ini;
-    //     {
-    //         show_time _("std::sort");
-    //         std::sort(a.data(), a.data() + a.size());
-    //     }
-    //     if (!std::is_sorted(a.begin(), a.end())) throw;
-    // }
+    {
+        std::vector<uint32_t> a = ini;
+        {
+            show_time _("std::sort");
+            std::sort(a.data(), a.data() + a.size());
+        }
+        if (!std::is_sorted(a.begin(), a.end())) throw;
+    }
 
-    // {
-    //     std::vector<uint32_t> a = ini;
-    //     {
-    //         show_time _("radix_sort_v1");
-    //         radix_sort_v1(a.data(), a.size());
-    //     }
-    //     if (!std::is_sorted(a.begin(), a.end())) throw;
-    // }
-    //
-    // {
-    //     std::vector<uint32_t> a = ini;
-    //     {
-    //         show_time _("radix_sort_v2");
-    //         radix_sort_v2(a.data(), a.size());
-    //     }
-    //     if (!std::is_sorted(a.begin(), a.end())) throw;
-    // }
-    //
-    // {
-    //     std::vector<uint32_t> a = ini;
-    //     {
-    //         show_time _("radix_sort_v3");
-    //         radix_sort_v3(a.data(), a.size());
-    //     }
-    //     if (!std::is_sorted(a.begin(), a.end())) throw;
-    // }
-    //
-    // {
-    //     std::vector<uint32_t> a = ini;
-    //     {
-    //         show_time _("radix_sort_v4");
-    //         radix_sort_v4(a.data(), a.size());
-    //     }
-    //     if (!std::is_sorted(a.begin(), a.end())) throw;
-    // }
-    //
+    {
+        std::vector<uint32_t> a = ini;
+        {
+            show_time _("tbb::sort");
+            tbb::parallel_sort(a.data(), a.data() + a.size());
+        }
+        if (!std::is_sorted(a.begin(), a.end())) throw;
+    }
+
+    {
+        std::vector<uint32_t> a = ini;
+        {
+            show_time _("radix_sort_v1");
+            radix_sort_v1(a.data(), a.size());
+        }
+        if (!std::is_sorted(a.begin(), a.end())) throw;
+    }
+    
+    {
+        std::vector<uint32_t> a = ini;
+        {
+            show_time _("radix_sort_v2");
+            radix_sort_v2(a.data(), a.size());
+        }
+        if (!std::is_sorted(a.begin(), a.end())) throw;
+    }
+    
+    {
+        std::vector<uint32_t> a = ini;
+        {
+            show_time _("radix_sort_v3");
+            radix_sort_v3(a.data(), a.size());
+        }
+        if (!std::is_sorted(a.begin(), a.end())) throw;
+    }
+    
+    {
+        std::vector<uint32_t> a = ini;
+        {
+            show_time _("radix_sort_v4");
+            radix_sort_v4(a.data(), a.size());
+        }
+        if (!std::is_sorted(a.begin(), a.end())) throw;
+    }
+
     {
         std::vector<uint32_t> a = ini;
         {
