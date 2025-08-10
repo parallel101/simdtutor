@@ -10,13 +10,11 @@ alignas(64) std::atomic_int write_pos;
 alignas(64) std::atomic_int read_pos;
 alignas(64) int read_pos_cached;
 alignas(64) int write_pos_cached;
-alignas(64) int write_pos_local;
-alignas(64) int read_pos_local;
 
 void ring_push(int value)
 {
 again:
-    int w = write_pos_local;
+    int w = write_pos.load(std::memory_order_relaxed);
     int next_w = (w + 1) % 1024;
     if (next_w == read_pos_cached) {
         read_pos_cached = read_pos.load(std::memory_order_relaxed);
@@ -25,14 +23,13 @@ again:
         }
     }
     ring[w] = value;
-    write_pos_local = next_w;
     write_pos.store(next_w, std::memory_order_release);
 }
 
 int ring_pop()
 {
 again:
-    int r = read_pos_local;
+    int r = read_pos.load(std::memory_order_relaxed);
     if (r == write_pos_cached) {
         write_pos_cached = write_pos.load(std::memory_order_acquire);
         if (r == write_pos_cached) {
@@ -41,7 +38,6 @@ again:
     }
     int next_r = (r + 1) % 1024;
     int value = ring[r];
-    read_pos_local = next_r;
     read_pos.store(next_r, std::memory_order_relaxed);
     return value;
 }
