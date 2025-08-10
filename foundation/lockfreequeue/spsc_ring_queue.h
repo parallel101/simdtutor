@@ -41,7 +41,7 @@ public:
 
         size_t read_remain() noexcept {
             if (read_pos == read_end_pos) {
-                read_end_pos = queue->write_ok_pos.load(std::memory_order_acquire);
+                read_end_pos = queue->write_ok_pos.load(std::memory_order_relaxed);
             }
             ptrdiff_t diff = read_end_pos - read_pos;
             if (diff < 0) {
@@ -68,12 +68,7 @@ public:
                     read_pos = queue->data.begin;
                 }
             }
-            T *r_ok_pos = read_pos;
-            if (r_ok_pos == queue->data.begin) {
-                r_ok_pos = queue->data.end;
-            }
-            --r_ok_pos;
-            queue->read_ok_pos.store(r_ok_pos, std::memory_order_relaxed);
+            queue->read_ok_pos.store(read_pos, std::memory_order_release);
             return p;
         }
 
@@ -110,9 +105,14 @@ public:
         const T *write(const T *buf, const T *buf_end) noexcept {
             const T *p = buf;
             while (p != buf_end) {
-                if (write_pos == write_end_pos) {
-                    write_end_pos = queue->read_ok_pos.load(std::memory_order_relaxed);
-                    if (write_pos == write_end_pos) {
+                T *next_write_pos = write_pos;
+                ++next_write_pos;
+                if (next_write_pos == queue->data.end) {
+                    next_write_pos = queue->data.begin;
+                }
+                if (next_write_pos == write_end_pos) {
+                    write_end_pos = queue->read_ok_pos.load(std::memory_order_acquire);
+                    if (next_write_pos == write_end_pos) {
                         break;
                     } else {
                         continue;
@@ -120,10 +120,7 @@ public:
                 }
                 *write_pos = *p;
                 ++p;
-                ++write_pos;
-                if (write_pos == queue->data.end) {
-                    write_pos = queue->data.begin;
-                }
+                write_pos = next_write_pos;
             }
             queue->write_ok_pos.store(write_pos, std::memory_order_release);
             return p;
