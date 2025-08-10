@@ -5,9 +5,9 @@
 #include <smmintrin.h>
 
 
-alignas(64) int ring[1024];
-alignas(64) std::atomic_int write_pos;
-alignas(64) std::atomic_int read_pos;
+int ring[1024];
+std::atomic_int write_pos;
+std::atomic_int read_pos;
 
 void ring_push(int value)
 {
