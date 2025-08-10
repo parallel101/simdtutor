@@ -1,14 +1,14 @@
-#include <fmt/format.h>
-#include <fmt/ranges.h>
-#include <thread>
-#include "show_time.h"
-#include <smmintrin.h>
+#pragma once
+
+#include <atomic>
+#include <cstddef>
 
 
 template <class T, size_t N, bool AtomicWait = false>
 struct alignas(64) spsc_ring
 {
-    alignas(64) T m_ring_buffer[N];
+    static_assert(std::atomic<T *>::is_always_lock_free, "atomic pointer not lock-free");
+
     alignas(64) std::atomic<T *> m_write_pos;
     alignas(64) std::atomic<T *> m_read_pos;
 
@@ -21,6 +21,8 @@ struct alignas(64) spsc_ring
         T *m_read_pos_cached;
         T *m_write_pos_local;
     };
+
+    alignas(64) T m_ring_buffer[N];
 
     spsc_ring()
         : m_write_pos{m_ring_buffer}
@@ -167,46 +169,3 @@ struct alignas(64) spsc_ring
         return output_first;
     }
 };
-
-
-spsc_ring<int, 1024, true> ring;
-
-const int N = 1024 * 1024;
-
-void producer()
-{
-    const int B = 512;
-    static int buf[B];
-    for (int i = 0; i < B; ++i) {
-        buf[i] = i;
-    }
-    for (int j = 0; j < N / B; ++j) {
-        ring.write(buf, buf + B);
-    }
-}
-
-void consumer()
-{
-    const int B = 512;
-    static int buf[B];
-    for (int j = 0; j < N / B; ++j) {
-        ring.read(buf, buf + B);
-        for (int i = 0; i < B; ++i) {
-            if (buf[i] != i) [[unlikely]] {
-                fmt::println("Data Error: {} != {}", buf[i], i);
-                exit(1);
-            }
-        }
-    }
-}
-
-int main()
-{
-    for (int i = 0; i < 100; ++i) {
-        show_time _("queue");
-        std::jthread producer_thread(producer);
-        std::jthread consumer_thread(consumer);
-        producer_thread.join();
-        consumer_thread.join();
-    }
-}
