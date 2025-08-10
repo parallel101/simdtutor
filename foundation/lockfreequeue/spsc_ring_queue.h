@@ -18,7 +18,7 @@ class alignas(64) spsc_ring_queue
     } data;
 
 public:
-    spsc_ring_queue() noexcept : write_ok_pos(data.begin), read_ok_pos(data.end - 1) {
+    spsc_ring_queue() noexcept : write_ok_pos(data.begin), read_ok_pos(data.begin) {
     }
 
     spsc_ring_queue(spsc_ring_queue &&) = delete;

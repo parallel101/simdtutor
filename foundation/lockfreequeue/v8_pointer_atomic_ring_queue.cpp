@@ -22,7 +22,7 @@ again:
         next_w = ring;
     }
     if (next_w == read_pos_cached) {
-        read_pos_cached = read_pos.load(std::memory_order_acquire);
+        read_pos_cached = read_pos.load(std::memory_order_relaxed);
         if (next_w == read_pos_cached) {
             goto again;
         }
@@ -48,7 +48,7 @@ again:
     }
     int value = *r;
     read_pos_local = next_r;
-    read_pos.store(next_r, std::memory_order_release);
+    read_pos.store(next_r, std::memory_order_relaxed);
     return value;
 }
 
